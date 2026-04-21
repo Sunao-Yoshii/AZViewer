@@ -30,6 +30,12 @@ cd ..
 python backend\main.py
 ```
 
+## release build
+
+```powershell
+.\build_windows.ps1
+```
+
 ## Development
 
 Run the Vite dev server:

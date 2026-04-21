@@ -13,7 +13,7 @@ except ImportError:
 
 
 APP_TITLE = "AZViewer"
-ROOT_DIR = Path(__file__).resolve().parents[1]
+ROOT_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
 FRONTEND_DIST = ROOT_DIR / "frontend" / "dist" / "index.html"
 
 
