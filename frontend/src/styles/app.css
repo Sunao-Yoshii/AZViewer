@@ -33,6 +33,19 @@ body {
 .app-sidebar {
   width: 280px;
   min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-sidebar-upload {
+  height: 200px;
+  flex: 0 0 200px;
+}
+
+.app-sidebar-menu {
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -46,6 +59,85 @@ body {
   height: 0.5rem;
   margin-right: 0.35rem;
   border-radius: 50%;
+}
+
+.file-select-target {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: center;
+  height: 100%;
+  padding: 0.75rem;
+  text-align: center;
+  background: #fff;
+  border: 1px dashed #adb5bd;
+  border-radius: 0.375rem;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.file-select-target.is-busy {
+  opacity: 0.75;
+}
+
+.file-select-main {
+  min-height: 0;
+}
+
+.file-select-icon {
+  display: block;
+  margin-bottom: 0.25rem;
+  color: #0d6efd;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.file-select-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.file-select-description,
+.file-select-status {
+  color: #6c757d;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.file-select-actions {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.file-select-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+}
+
+.file-select-status {
+  min-height: 0.9rem;
+  margin-top: 0.35rem;
+}
+
+.modal-backdrop-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 1050;
+}
+
+.modal-backdrop-shell .modal {
+  z-index: 1055;
+}
+
+.failed-file-list {
+  max-height: 15rem;
+  overflow: auto;
 }
 
 .response-view {
@@ -67,6 +159,11 @@ body {
   .app-sidebar {
     width: 100%;
     min-width: 0;
-    max-height: 180px;
+    max-height: 320px;
+  }
+
+  .app-sidebar-upload {
+    height: 180px;
+    flex-basis: 180px;
   }
 }

@@ -43,3 +43,15 @@ export async function callBackendApi(methodName, ...args) {
     }
   }
 }
+
+export async function importSelectedItems(items) {
+  return await callBackendApi('import_selected_items', { items })
+}
+
+export async function selectFilesDialog() {
+  return await callBackendApi('select_files_dialog')
+}
+
+export async function selectFolderDialog() {
+  return await callBackendApi('select_folder_dialog')
+}

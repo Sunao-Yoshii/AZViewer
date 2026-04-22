@@ -6,14 +6,17 @@ from pathlib import Path
 
 import webview
 
+APP_TITLE = "AZViewer"
+ROOT_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
 try:
     from .api.app_api import AppApi
 except ImportError:
-    from api.app_api import AppApi
+    from backend.api.app_api import AppApi
 
 
-APP_TITLE = "AZViewer"
-ROOT_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
 FRONTEND_DIST = ROOT_DIR / "frontend" / "dist" / "index.html"
 
 
@@ -39,15 +42,26 @@ def main() -> int:
         print(exc, file=sys.stderr)
         return 1
 
+    api = AppApi()
+    try:
+        api.initialize_app_backend()
+    except Exception as exc:
+        print(f"Application initialization failed: {exc}", file=sys.stderr)
+        api.close()
+        return 1
+
     webview.create_window(
         APP_TITLE,
         entry_url,
-        js_api=AppApi(),
+        js_api=api,
         width=1200,
         height=800,
         min_size=(900, 600),
     )
-    webview.start()
+    try:
+        webview.start() # debug option. debug=True
+    finally:
+        api.close()
     return 0
 
 

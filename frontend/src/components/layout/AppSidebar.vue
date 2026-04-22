@@ -1,4 +1,6 @@
 <script setup>
+import FileSelectArea from '../upload/FileSelectArea.vue'
+
 defineProps({
   menus: {
     type: Array,
@@ -15,7 +17,11 @@ defineEmits(['change-page'])
 
 <template>
   <aside class="app-sidebar border-end bg-light">
-    <nav class="nav nav-pills flex-column gap-1 p-3">
+    <div class="app-sidebar-upload p-3 border-bottom">
+      <FileSelectArea />
+    </div>
+
+    <nav class="app-sidebar-menu nav nav-pills flex-column gap-1 p-3">
       <button
         v-for="menu in menus"
         :key="menu.key"
@@ -30,4 +36,3 @@ defineEmits(['change-page'])
     </nav>
   </aside>
 </template>
-
