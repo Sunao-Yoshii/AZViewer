@@ -9,17 +9,23 @@ from backend.services.file_scan_service import FileScanService
 
 
 class ImageFileImportService:
+    """選択されたファイルまたはフォルダから画像ファイル情報を登録する。"""
+
     def __init__(
         self,
         connection: Connection,
         repository: ImageFileRepository,
         file_scan_service: FileScanService,
     ) -> None:
+        """登録処理で利用するDB接続、リポジトリ、スキャンサービスを保持する。"""
+
         self._connection = connection
         self._repository = repository
         self._file_scan_service = file_scan_service
 
     def import_items(self, payload: dict[str, Any]) -> ImportResult:
+        """入力ペイロードを解析し、未登録の画像ファイル情報をデータベースへ登録する。"""
+
         items = payload.get("items") if isinstance(payload, dict) else None
         if not isinstance(items, list):
             return ImportResult(

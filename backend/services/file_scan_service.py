@@ -7,12 +7,18 @@ from backend.models import ImageFileRecord
 
 
 class FileScanService:
+    """登録対象として扱える画像ファイルを抽出し、保存用データへ変換する。"""
+
     SUPPORTED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".webp", ".avif"}
 
     def is_supported_image(self, path: Path) -> bool:
+        """指定パスが対応拡張子の画像ファイルか判定する。"""
+
         return path.is_file() and path.suffix.lower() in self.SUPPORTED_EXTENSIONS
 
     def collect_image_paths(self, items: list[dict[str, Any]]) -> list[Path]:
+        """ファイルまたはフォルダ指定から登録対象の画像ファイルパスを収集する。"""
+
         collected: list[Path] = []
 
         for item in items:
@@ -33,6 +39,8 @@ class FileScanService:
         return self._dedupe_paths(collected)
 
     def build_record(self, path: Path) -> ImageFileRecord:
+        """画像ファイルパスからデータベース登録用レコードを生成する。"""
+
         return ImageFileRecord(
             filename=path.name,
             path=str(path),
@@ -40,6 +48,8 @@ class FileScanService:
         )
 
     def _collect_direct_children(self, directory: Path) -> list[Path]:
+        """指定フォルダ直下にある対応画像ファイルのみを収集する。"""
+
         if not directory.is_dir():
             return []
 
@@ -50,6 +60,8 @@ class FileScanService:
         ]
 
     def _dedupe_paths(self, paths: list[Path]) -> list[Path]:
+        """パス一覧の順序を維持したまま重複を除去する。"""
+
         seen: set[str] = set()
         deduped: list[Path] = []
 

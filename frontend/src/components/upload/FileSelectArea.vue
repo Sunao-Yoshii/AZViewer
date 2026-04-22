@@ -92,6 +92,20 @@ async function handleSelectFolder() {
 
   await importItems(result.data?.items ?? [])
 }
+
+function handleDragEvent(event) {
+  const files = Array.from(event.dataTransfer?.files ?? []).map((file) => ({
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  }))
+
+  console.log('FileSelectArea drag/drop event', {
+    type: event.type,
+    fileCount: files.length,
+    files,
+  })
+}
 </script>
 
 <template>
@@ -99,10 +113,14 @@ async function handleSelectFolder() {
     <div
       class="file-select-target"
       :class="{ 'is-busy': isBusy }"
+      @dragenter="handleDragEvent"
+      @dragover="handleDragEvent"
+      @dragleave="handleDragEvent"
+      @drop="handleDragEvent"
     >
       <div class="file-select-main">
         <i class="bi bi-images file-select-icon" aria-hidden="true"></i>
-        <p class="file-select-title mb-1">画像ファイルまたはフォルダを選択</p>
+        <p class="file-select-title mb-1">画像ファイルまたはフォルダをドラッグ＆ドロップ</p>
         <p class="file-select-description mb-0">png / jpg / jpeg / webp / avif</p>
         <p class="file-select-description mb-0">フォルダは直下ファイルのみ対象</p>
       </div>

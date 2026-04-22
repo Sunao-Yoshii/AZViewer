@@ -6,10 +6,16 @@ from backend.models import ImageFileRecord
 
 
 class ImageFileRepository:
+    """画像ファイル情報を保存するSQLiteテーブルへのアクセスを担当する。"""
+
     def __init__(self, connection: Connection) -> None:
+        """リポジトリで利用するSQLite接続を保持する。"""
+
         self._connection = connection
 
     def create_table(self) -> None:
+        """画像ファイル情報を保存するテーブルを作成する。"""
+
         self._connection.execute(
             """
             CREATE TABLE IF NOT EXISTS image_file_data (
@@ -27,10 +33,14 @@ class ImageFileRepository:
         self._connection.commit()
 
     def find_all_paths(self) -> list[str]:
+        """登録済み画像ファイルのパス一覧を取得する。"""
+
         rows = self._connection.execute("SELECT path FROM image_file_data").fetchall()
         return [str(row["path"]) for row in rows]
 
     def delete_by_paths(self, paths: list[str]) -> None:
+        """指定されたパスに一致する画像ファイル情報を削除する。"""
+
         if not paths:
             return
 
@@ -40,6 +50,8 @@ class ImageFileRepository:
         )
 
     def insert_many(self, records: list[ImageFileRecord]) -> None:
+        """複数の画像ファイル情報を一括登録する。"""
+
         if not records:
             return
 
@@ -71,6 +83,8 @@ class ImageFileRepository:
         )
 
     def exists_by_path(self, path: str) -> bool:
+        """指定されたパスの画像ファイル情報が登録済みか判定する。"""
+
         row = self._connection.execute(
             "SELECT 1 FROM image_file_data WHERE path = ? LIMIT 1",
             (path,),

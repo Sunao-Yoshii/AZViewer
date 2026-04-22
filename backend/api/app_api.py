@@ -18,11 +18,15 @@ from backend.services import (
 
 @dataclass(frozen=True)
 class ApiResponse:
+    """Vueへ返却するpywebview APIレスポンスの共通形式を表す。"""
+
     success: bool
     message: str
     data: Any = None
 
     def to_dict(self) -> dict[str, Any]:
+        """pywebview経由で返却しやすい辞書形式に変換する。"""
+
         return {
             "success": self.success,
             "message": self.message,
@@ -31,9 +35,11 @@ class ApiResponse:
 
 
 class AppApi:
-    """Public API exposed to Vue through pywebview."""
+    """pywebviewを通じてVueへ公開するアプリケーションAPIを提供する。"""
 
     def __init__(self) -> None:
+        """APIが利用する各種サービスと遅延初期化用の状態を準備する。"""
+
         self._connection_manager = ConnectionManager()
         self._repository: ImageFileRepository | None = None
         self._import_service: ImageFileImportService | None = None
@@ -41,6 +47,8 @@ class AppApi:
         self._dialog_service = DialogService(self._get_active_window)
 
     def initialize_app_backend(self) -> None:
+        """データベース、リポジトリ、サービスを初期化する。"""
+
         self._connection_manager.initialize()
         connection = self._connection_manager.get_connection()
         file_scan_service = FileScanService()
@@ -56,12 +64,18 @@ class AppApi:
         self._cleanup_service.cleanup_missing_files()
 
     def close(self) -> None:
+        """アプリケーション終了時に保持している接続を閉じる。"""
+
         self._connection_manager.close()
 
     def initialize(self) -> dict[str, Any]:
+        """互換用の初期化APIとしてアプリ初期化情報を返す。"""
+
         return self.initialize_app()
 
     def initialize_app(self) -> dict[str, Any]:
+        """Vue側の起動時に必要な初期化済みアプリ情報を返す。"""
+
         return ApiResponse(
             success=True,
             message="",
@@ -72,6 +86,8 @@ class AppApi:
         ).to_dict()
 
     def get_app_info(self) -> dict[str, Any]:
+        """アプリケーション名やバージョンなどの基本情報を返す。"""
+
         return ApiResponse(
             success=True,
             message="Application information loaded.",
@@ -83,6 +99,8 @@ class AppApi:
         ).to_dict()
 
     def get_menu_definitions(self) -> dict[str, Any]:
+        """サイドバーなどで表示するメニュー定義を返す。"""
+
         return ApiResponse(
             success=True,
             message="Menu definitions loaded.",
@@ -101,6 +119,8 @@ class AppApi:
         ).to_dict()
 
     def health_check(self) -> dict[str, Any]:
+        """Python APIが呼び出し可能か確認するための応答を返す。"""
+
         return ApiResponse(
             success=True,
             message="Python API is available.",
@@ -111,6 +131,8 @@ class AppApi:
         ).to_dict()
 
     def import_selected_items(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """選択またはドロップされたファイル情報を画像データとして登録する。"""
+
         service = self._get_import_service()
         result = service.import_items(payload)
         return ApiResponse(
@@ -120,6 +142,8 @@ class AppApi:
         ).to_dict()
 
     def select_files_dialog(self) -> dict[str, Any]:
+        """ネイティブファイル選択ダイアログを開き、選択結果を返す。"""
+
         try:
             items = self._dialog_service.select_files()
             return ApiResponse(
@@ -131,6 +155,8 @@ class AppApi:
             return ApiResponse(success=False, message=str(exc), data=None).to_dict()
 
     def select_folder_dialog(self) -> dict[str, Any]:
+        """ネイティブフォルダ選択ダイアログを開き、選択結果を返す。"""
+
         try:
             items = self._dialog_service.select_folder()
             return ApiResponse(
@@ -142,6 +168,8 @@ class AppApi:
             return ApiResponse(success=False, message=str(exc), data=None).to_dict()
 
     def _get_import_service(self) -> ImageFileImportService:
+        """画像ファイル登録サービスを取得し、未初期化の場合は初期化する。"""
+
         if self._import_service is None:
             self.initialize_app_backend()
         if self._import_service is None:
@@ -149,6 +177,8 @@ class AppApi:
         return self._import_service
 
     def _get_active_window(self) -> object | None:
+        """現在利用可能なpywebviewウィンドウを返す。"""
+
         if not webview.windows:
             return None
         return webview.windows[0]

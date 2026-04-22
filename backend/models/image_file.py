@@ -5,6 +5,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class ImageFileRecord:
+    """データベースへ保存する画像ファイル1件分の情報を表す。"""
+
     filename: str
     path: str
     folder: str
@@ -16,6 +18,8 @@ class ImageFileRecord:
 
 @dataclass(frozen=True)
 class ImportResult:
+    """画像ファイル登録処理の結果を表す。"""
+
     success: bool
     error_summary: str | None = None
     failed_files: list[str] | None = None
@@ -24,6 +28,8 @@ class ImportResult:
     skipped_count: int = 0
 
     def to_api_data(self) -> dict[str, object] | None:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
         if self.success:
             return {
                 "importedCount": self.imported_count,

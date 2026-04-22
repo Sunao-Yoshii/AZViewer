@@ -2,19 +2,6 @@
 
 pywebview + Vue + Bootstrap application foundation.
 
-## Structure
-
-```text
-backend/
-  main.py
-  api/app_api.py
-frontend/
-  src/
-    components/layout/
-    pages/
-    services/
-```
-
 ## Setup
 
 ```powershell
