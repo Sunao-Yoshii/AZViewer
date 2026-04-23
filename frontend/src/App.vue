@@ -150,12 +150,6 @@ async function loadInitialData() {
   isOverlayVisible.value = false
 }
 
-async function runHealthCheck() {
-  setStatus('info', 'ヘルスチェック実行中')
-  const result = await callBackendApi('health_check')
-  setStatus(result.success ? 'success' : 'danger', result.message)
-}
-
 async function handleSearch() {
   await executeSearch({ page: 1 }, true)
 }
@@ -253,7 +247,6 @@ onBeforeUnmount(() => {
     :is-searching="isSearching"
     @search="handleSearch"
     @import-complete="handleImportComplete"
-    @health-check="runHealthCheck"
   >
     <Home
       :search-result="searchResult"

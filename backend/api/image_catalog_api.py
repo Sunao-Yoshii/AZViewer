@@ -69,19 +69,23 @@ class ImageCatalogApi:
         try:
             record_id = int(data.get("id"))
         except (TypeError, ValueError):
+            print("Invalid id value:", data.get("id"))
             return ApiResponse(success=False, message="id is required.", data=None).to_dict()
 
         item = self._get_repository().find_by_id(record_id)
         if item is None:
+            print("Image file not found:", record_id)
             return ApiResponse(success=False, message="Image file was not found.", data=None).to_dict()
 
         image_path = Path(item.path)
         if not image_path.is_file():
+            print("Image file is not a valid file:", image_path)
             return ApiResponse(success=False, message="Image file was not found.", data=None).to_dict()
 
         try:
             binary = image_path.read_bytes()
         except OSError as exc:
+            print("Error reading image file:", exc)
             return ApiResponse(success=False, message=str(exc), data=None).to_dict()
 
         content_type = mimetypes.guess_type(image_path.name)[0] or "application/octet-stream"

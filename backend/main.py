@@ -82,6 +82,7 @@ def register_handlers(window: object, api: AppApi) -> None:
     def on_drop(event: dict[str, Any]) -> None:
         """ドロップされたファイルまたはフォルダを既存の登録処理へ渡す。"""
 
+        print("Event: drop")
         items = create_drop_items(event)
         if not items:
             print("Event: drop. Dropped files were not available.")
@@ -112,7 +113,7 @@ def register_handlers(window: object, api: AppApi) -> None:
     window.dom.document.events.dragstart += DOMEventHandler(on_drag, True, True)
     window.dom.document.events.dragover += DOMEventHandler(on_drag, True, True, debounce=500)
     window.dom.document.events.drop += DOMEventHandler(on_drop, True, True)
-    window.dom.document.events.load += DOMEventHandler(lambda _: api.bootstrap_app(), True, True)
+    # window.dom.document.events.load += DOMEventHandler(lambda _: api.bootstrap_app(), True, True)
 
 
 def main() -> int:

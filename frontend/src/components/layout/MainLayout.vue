@@ -22,12 +22,12 @@ defineProps({
   },
 })
 
-defineEmits(['search', 'health-check', 'import-complete'])
+defineEmits(['search', 'import-complete'])
 </script>
 
 <template>
   <div class="app-shell">
-    <AppHeader :app-info="appInfo" @health-check="$emit('health-check')" />
+    <AppHeader :app-info="appInfo" />
 
     <div class="app-body d-flex">
       <AppSidebar
