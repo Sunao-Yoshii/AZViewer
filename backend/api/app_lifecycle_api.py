@@ -3,6 +3,9 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from backend.repositories import ImageFileRepository
+from backend.services import StartupCleanupService
+
 from .api_response import ApiResponse
 from .default_template_api import DefaultTemplateApi
 from .service_manager import ServiceManager
@@ -23,6 +26,8 @@ class AppLifeCycleApi:
         self._service_manager = service_manager
         self._default_template_api = default_template_api
         self._startup_cleanup_completed = False
+        self._repository: ImageFileRepository | None = None
+        self._cleanup_service: StartupCleanupService | None = None
 
     def initialize(self) -> dict[str, Any]:
         """互換用の初期化APIとしてアプリ初期化情報を返す。"""
@@ -69,7 +74,7 @@ class AppLifeCycleApi:
         """起動時整合性確認を同期実行し、必要時のみ通知情報を返す。"""
 
         try:
-            deleted_count = self._service_manager.cleanup_service.cleanup_missing_files()
+            deleted_count = self._get_cleanup_service().cleanup_missing_files()
         except Exception:
             LOGGER.exception("Startup cleanup failed.")
             return {
@@ -85,3 +90,15 @@ class AppLifeCycleApi:
             "title": "ファイル状態確認が完了しました",
             "message": f"存在しないファイルの登録情報を {deleted_count} 件削除しました",
         }
+
+    def _get_cleanup_service(self) -> StartupCleanupService:
+        """起動時整合性確認サービスを取得し、未初期化の場合は初期化する。"""
+
+        if self._cleanup_service is not None:
+            return self._cleanup_service
+
+        connection = self._service_manager.get_connection()
+        self._repository = ImageFileRepository(connection)
+        self._repository.create_table()
+        self._cleanup_service = StartupCleanupService(connection, self._repository)
+        return self._cleanup_service

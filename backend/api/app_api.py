@@ -14,12 +14,12 @@ class AppApi:
     def __init__(self) -> None:
         """内部ロジックごとのAPIクラスを組み立てる。"""
 
-        service_manager = ServiceManager(self._get_active_window)
+        service_manager = ServiceManager()
         default_template_api = DefaultTemplateApi()
 
         self._app_lifecycle_api = AppLifeCycleApi(service_manager, default_template_api)
         self._default_template_api = default_template_api
-        self._image_register_api = ImageRegisterApi(service_manager)
+        self._image_register_api = ImageRegisterApi(service_manager, self._get_active_window)
 
     def close(self) -> None:
         """アプリケーション終了時に保持している接続を閉じる。"""
