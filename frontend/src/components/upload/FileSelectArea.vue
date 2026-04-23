@@ -7,6 +7,7 @@ import {
 } from '../../services/backendApi'
 import ErrorModal from './ErrorModal.vue'
 
+const emit = defineEmits(['import-complete'])
 const isBusy = ref(false)
 const statusMessage = ref('')
 const errorModal = ref({
@@ -40,6 +41,7 @@ async function importItems(items) {
     const importedCount = result.data?.importedCount ?? 0
     const skippedCount = result.data?.skippedCount ?? 0
     statusMessage.value = `登録 ${importedCount} 件 / 除外 ${skippedCount} 件`
+    emit('import-complete', { importedCount, skippedCount })
   } else {
     errorModal.value = {
       show: true,

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from math import ceil
 from sqlite3 import Connection
 
-from backend.models import ImageFileRecord
+from backend.models import ImageFileListItem, ImageFileRecord, SearchImageFilesResult
 
 
 class ImageFileRepository:
@@ -90,3 +91,149 @@ class ImageFileRepository:
             (path,),
         ).fetchone()
         return row is not None
+
+    def search(
+        self,
+        *,
+        path: str = "",
+        rating: str | None = None,
+        is_checked: bool | int | None = None,
+        is_favorite: bool | int | None = None,
+        page: int = 1,
+        page_size: int = 25,
+        sort: str = "id_desc",
+    ) -> SearchImageFilesResult:
+        """条件に一致する画像一覧をページング付きで取得する。"""
+
+        safe_page = max(1, int(page))
+        safe_page_size = max(1, int(page_size))
+        where_clauses: list[str] = []
+        params: list[object] = []
+
+        normalized_path = path.strip()
+        if normalized_path:
+            where_clauses.append("path LIKE ?")
+            params.append(f"%{normalized_path}%")
+
+        if rating:
+            where_clauses.append("rating = ?")
+            params.append(rating)
+
+        if self._normalize_true_condition(is_checked):
+            where_clauses.append("is_checked = 1")
+
+        if self._normalize_true_condition(is_favorite):
+            where_clauses.append("is_favorite = 1")
+
+        where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        total_count = int(
+            self._connection.execute(
+                f"SELECT COUNT(*) AS count FROM image_file_data {where_sql}",
+                params,
+            ).fetchone()["count"]
+        )
+        total_pages = ceil(total_count / safe_page_size) if total_count > 0 else 0
+        offset = (safe_page - 1) * safe_page_size
+        order_sql = self._build_order_by(sort)
+        rows = self._connection.execute(
+            f"""
+            SELECT
+                id,
+                filename,
+                path,
+                folder,
+                rating,
+                is_checked,
+                is_favorite,
+                comment
+            FROM image_file_data
+            {where_sql}
+            ORDER BY {order_sql}
+            LIMIT ? OFFSET ?
+            """,
+            [*params, safe_page_size, offset],
+        ).fetchall()
+
+        items = [self._row_to_item(row) for row in rows]
+        return SearchImageFilesResult(
+            items=items,
+            total_count=total_count,
+            total_pages=total_pages,
+            page=safe_page,
+            page_size=safe_page_size,
+        )
+
+    def update_flag(self, record_id: int, field: str, value: int) -> bool:
+        """指定レコードのフラグ項目を更新する。"""
+
+        if field not in {"is_checked", "is_favorite"}:
+            raise ValueError("field must be 'is_checked' or 'is_favorite'.")
+        if value not in {0, 1}:
+            raise ValueError("value must be 0 or 1.")
+
+        cursor = self._connection.execute(
+            f"UPDATE image_file_data SET {field} = ? WHERE id = ?",
+            (value, record_id),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
+
+    def find_by_id(self, record_id: int) -> ImageFileListItem | None:
+        """IDに一致する画像ファイル情報を取得する。"""
+
+        row = self._connection.execute(
+            """
+            SELECT
+                id,
+                filename,
+                path,
+                folder,
+                rating,
+                is_checked,
+                is_favorite,
+                comment
+            FROM image_file_data
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (record_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return self._row_to_item(row)
+
+    def _row_to_item(self, row) -> ImageFileListItem:
+        """SQLite行データを一覧表示用DTOへ変換する。"""
+
+        return ImageFileListItem(
+            id=int(row["id"]),
+            filename=str(row["filename"]),
+            path=str(row["path"]),
+            folder=str(row["folder"]),
+            rating=str(row["rating"]),
+            is_checked=int(row["is_checked"]),
+            is_favorite=int(row["is_favorite"]),
+            comment=None if row["comment"] is None else str(row["comment"]),
+        )
+
+    def _build_order_by(self, sort: str) -> str:
+        """許可済みソート値からORDER BY句を生成する。"""
+
+        mapping = {
+            "id_desc": "id DESC",
+            "id_asc": "id ASC",
+            "filename_asc": "filename COLLATE NOCASE ASC, id DESC",
+            "filename_desc": "filename COLLATE NOCASE DESC, id DESC",
+            "rating_asc": "rating ASC, id DESC",
+            "rating_desc": "rating DESC, id DESC",
+        }
+        return mapping.get(sort, mapping["id_desc"])
+
+    def _normalize_true_condition(self, value: bool | int | None) -> bool:
+        """検索条件値をtrue条件として評価する。"""
+
+        if value is None:
+            return False
+        if isinstance(value, bool):
+            return value
+        return int(value) == 1

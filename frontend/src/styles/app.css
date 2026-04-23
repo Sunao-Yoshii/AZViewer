@@ -151,6 +151,51 @@ body {
   border-radius: 0.375rem;
 }
 
+.home-control {
+  width: auto;
+  min-width: 8.5rem;
+}
+
+.image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 150px);
+  gap: 1rem;
+  align-content: start;
+}
+
+.image-tile {
+  width: 150px;
+}
+
+.image-tile-thumb {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  background: #f8f9fa;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.image-tile-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0.75rem;
+}
+
+.image-tile-folder {
+  min-height: 1.25rem;
+}
+
+.image-tile-comment {
+  height: 20px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  white-space: pre-wrap;
+  line-height: 1.2;
+  border-top: 1px solid #f1f3f5;
+  padding-top: 0.35rem;
+}
+
 .startup-overlay {
   position: fixed;
   inset: 0;

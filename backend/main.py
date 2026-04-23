@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import sys
 from pathlib import Path
@@ -86,7 +87,6 @@ def register_handlers(window: object, api: AppApi) -> None:
             print("Event: drop. Dropped files were not available.")
             return
 
-        print("Event: drop. Dropped paths:")
         for item in items:
             print(item["path"])
 
@@ -98,6 +98,12 @@ def register_handlers(window: object, api: AppApi) -> None:
                 f"Imported: {data.get('importedCount', 0)}, "
                 f"Skipped: {data.get('skippedCount', 0)}"
             )
+            window.evaluate_js(
+                "window.dispatchEvent(new CustomEvent("
+                "'azviewer:import-complete', "
+                f"{{ detail: {json.dumps(data)} }}"
+                "));"
+            )
             return
 
         print(f"Drop import failed: {result.get('message', '')}", file=sys.stderr)
@@ -106,6 +112,7 @@ def register_handlers(window: object, api: AppApi) -> None:
     window.dom.document.events.dragstart += DOMEventHandler(on_drag, True, True)
     window.dom.document.events.dragover += DOMEventHandler(on_drag, True, True, debounce=500)
     window.dom.document.events.drop += DOMEventHandler(on_drop, True, True)
+    window.dom.document.events.load += DOMEventHandler(lambda _: api.bootstrap_app(), True, True)
 
 
 def main() -> int:

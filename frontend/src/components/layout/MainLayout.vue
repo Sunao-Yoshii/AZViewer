@@ -8,21 +8,21 @@ defineProps({
     type: Object,
     default: null,
   },
-  menus: {
-    type: Array,
-    required: true,
-  },
-  activePageKey: {
-    type: String,
+  filters: {
+    type: Object,
     required: true,
   },
   status: {
     type: Object,
     required: true,
   },
+  isSearching: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-defineEmits(['change-page', 'health-check'])
+defineEmits(['search', 'health-check', 'import-complete'])
 </script>
 
 <template>
@@ -31,9 +31,10 @@ defineEmits(['change-page', 'health-check'])
 
     <div class="app-body d-flex">
       <AppSidebar
-        :menus="menus"
-        :active-page-key="activePageKey"
-        @change-page="$emit('change-page', $event)"
+        :filters="filters"
+        :is-busy="isSearching"
+        @search="$emit('search')"
+        @import-complete="$emit('import-complete', $event)"
       />
 
       <main class="app-main flex-grow-1 overflow-auto">
@@ -46,4 +47,3 @@ defineEmits(['change-page', 'health-check'])
     <AppFooter :status="status" />
   </div>
 </template>
-

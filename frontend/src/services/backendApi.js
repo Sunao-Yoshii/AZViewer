@@ -55,3 +55,15 @@ export async function selectFilesDialog() {
 export async function selectFolderDialog() {
   return await callBackendApi('select_folder_dialog')
 }
+
+export async function searchImageFiles(payload) {
+  return await callBackendApi('search_image_files', payload)
+}
+
+export async function updateImageFileFlags(payload) {
+  return await callBackendApi('update_image_file_flags', payload)
+}
+
+export async function fetchLocalImageThumb(id) {
+  return await callBackendApi('fetchLocalImageThumb', { id })
+}

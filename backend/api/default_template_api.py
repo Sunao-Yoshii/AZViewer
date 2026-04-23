@@ -33,26 +33,6 @@ class DefaultTemplateApi:
             },
         ).to_dict()
 
-    def get_menu_definitions(self) -> dict[str, object]:
-        """サイドバーなどで表示するメニュー定義を返す。"""
-
-        return ApiResponse(
-            success=True,
-            message="Menu definitions loaded.",
-            data=[
-                {
-                    "key": "home",
-                    "label": "Home",
-                    "description": "基盤の概要とアプリ情報を表示します。",
-                },
-                {
-                    "key": "sample",
-                    "label": "Sample",
-                    "description": "今後の機能追加用プレースホルダです。",
-                },
-            ],
-        ).to_dict()
-
     def health_check(self) -> dict[str, object]:
         """Python APIが呼び出し可能か確認するための応答を返す。"""
 

@@ -8,6 +8,7 @@ from backend.services import StartupCleanupService
 
 from .api_response import ApiResponse
 from .default_template_api import DefaultTemplateApi
+from .image_catalog_api import ImageCatalogApi
 from .service_manager import ServiceManager
 
 LOGGER = logging.getLogger(__name__)
@@ -20,11 +21,13 @@ class AppLifeCycleApi:
         self,
         service_manager: ServiceManager,
         default_template_api: DefaultTemplateApi,
+        image_catalog_api: ImageCatalogApi,
     ) -> None:
         """起動時に利用するサービス管理と基本APIを保持する。"""
 
         self._service_manager = service_manager
         self._default_template_api = default_template_api
+        self._image_catalog_api = image_catalog_api
         self._startup_cleanup_completed = False
         self._repository: ImageFileRepository | None = None
         self._cleanup_service: StartupCleanupService | None = None
@@ -51,8 +54,18 @@ class AppLifeCycleApi:
                 self._startup_cleanup_completed = True
 
         app_info = self._default_template_api.get_app_info()
-        menu_definitions = self._default_template_api.get_menu_definitions()
         initialize_result = self._default_template_api.initialize_app()
+        initial_search_result = self._image_catalog_api.search_image_files(
+            {
+                "path": "",
+                "rating": None,
+                "is_checked": None,
+                "is_favorite": None,
+                "page": 1,
+                "page_size": 25,
+                "sort": "id_desc",
+            }
+        )
 
         return ApiResponse(
             success=True,
@@ -60,8 +73,8 @@ class AppLifeCycleApi:
             data={
                 "app": initialize_result.get("data"),
                 "appInfo": app_info.get("data"),
-                "menus": menu_definitions.get("data"),
                 "startupNotification": startup_notification,
+                "initialSearchResult": initial_search_result.get("data"),
             },
         ).to_dict()
 

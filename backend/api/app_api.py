@@ -4,6 +4,7 @@ import webview
 
 from .app_lifecycle_api import AppLifeCycleApi
 from .default_template_api import DefaultTemplateApi
+from .image_catalog_api import ImageCatalogApi
 from .image_register_api import ImageRegisterApi
 from .service_manager import ServiceManager
 
@@ -16,9 +17,15 @@ class AppApi:
 
         service_manager = ServiceManager()
         default_template_api = DefaultTemplateApi()
+        image_catalog_api = ImageCatalogApi(service_manager)
 
-        self._app_lifecycle_api = AppLifeCycleApi(service_manager, default_template_api)
+        self._app_lifecycle_api = AppLifeCycleApi(
+            service_manager,
+            default_template_api,
+            image_catalog_api,
+        )
         self._default_template_api = default_template_api
+        self._image_catalog_api = image_catalog_api
         self._image_register_api = ImageRegisterApi(service_manager, self._get_active_window)
 
     def close(self) -> None:
@@ -46,11 +53,6 @@ class AppApi:
 
         return self._default_template_api.get_app_info()
 
-    def get_menu_definitions(self) -> dict[str, object]:
-        """サイドバーなどで表示するメニュー定義を返す。"""
-
-        return self._default_template_api.get_menu_definitions()
-
     def health_check(self) -> dict[str, object]:
         """Python APIが呼び出し可能か確認するための応答を返す。"""
 
@@ -70,6 +72,21 @@ class AppApi:
         """ネイティブフォルダ選択ダイアログを開き、選択結果を返す。"""
 
         return self._image_register_api.select_folder_dialog()
+
+    def search_image_files(self, payload: dict[str, object]) -> dict[str, object]:
+        """画像一覧検索およびページング取得を行う。"""
+
+        return self._image_catalog_api.search_image_files(payload)
+
+    def update_image_file_flags(self, payload: dict[str, object]) -> dict[str, object]:
+        """指定レコードのフラグを更新する。"""
+
+        return self._image_catalog_api.update_image_file_flags(payload)
+
+    def fetchLocalImageThumb(self, payload: dict[str, object]) -> dict[str, object]:
+        """ローカル画像の表示用データURLを返す。"""
+
+        return self._image_catalog_api.fetchLocalImageThumb(payload)
 
     def _get_active_window(self) -> object | None:
         """現在利用可能なpywebviewウィンドウを返す。"""
