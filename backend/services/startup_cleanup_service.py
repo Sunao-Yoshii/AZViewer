@@ -15,14 +15,15 @@ class StartupCleanupService:
         self._connection = connection
         self._repository = repository
 
-    def cleanup_missing_files(self) -> None:
-        """実ファイルが存在しなくなった画像ファイル情報を削除する。"""
+    def cleanup_missing_files(self) -> int:
+        """実ファイルが存在しなくなった画像ファイル情報を削除し、削除件数を返す。"""
 
         paths = self._repository.find_all_paths()
         missing_paths = [path for path in paths if not Path(path).is_file()]
 
         if not missing_paths:
-            return
+            return 0
 
         self._repository.delete_by_paths(missing_paths)
         self._connection.commit()
+        return len(missing_paths)

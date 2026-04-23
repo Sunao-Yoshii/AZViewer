@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+import logging
 from typing import Any
 
 import webview
@@ -14,6 +15,8 @@ from backend.services import (
     ImageFileImportService,
     StartupCleanupService,
 )
+
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -41,6 +44,8 @@ class AppApi:
         """APIが利用する各種サービスと遅延初期化用の状態を準備する。"""
 
         self._connection_manager = ConnectionManager()
+        self._backend_initialized = False
+        self._startup_cleanup_completed = False
         self._repository: ImageFileRepository | None = None
         self._import_service: ImageFileImportService | None = None
         self._cleanup_service: StartupCleanupService | None = None
@@ -48,6 +53,9 @@ class AppApi:
 
     def initialize_app_backend(self) -> None:
         """データベース、リポジトリ、サービスを初期化する。"""
+
+        if self._backend_initialized:
+            return
 
         self._connection_manager.initialize()
         connection = self._connection_manager.get_connection()
@@ -61,7 +69,7 @@ class AppApi:
             file_scan_service,
         )
         self._cleanup_service = StartupCleanupService(connection, self._repository)
-        self._cleanup_service.cleanup_missing_files()
+        self._backend_initialized = True
 
     def close(self) -> None:
         """アプリケーション終了時に保持している接続を閉じる。"""
@@ -71,7 +79,7 @@ class AppApi:
     def initialize(self) -> dict[str, Any]:
         """互換用の初期化APIとしてアプリ初期化情報を返す。"""
 
-        return self.initialize_app()
+        return self.bootstrap_app()
 
     def initialize_app(self) -> dict[str, Any]:
         """Vue側の起動時に必要な初期化済みアプリ情報を返す。"""
@@ -82,6 +90,37 @@ class AppApi:
             data={
                 "appName": "AZViewer",
                 "initialized_at": datetime.now().isoformat(timespec="seconds"),
+            },
+        ).to_dict()
+
+    def bootstrap_app(self) -> dict[str, Any]:
+        """初回画面表示後の起動整合性確認を含むアプリ初期化結果を返す。"""
+
+        try:
+            self.initialize_app_backend()
+        except Exception as exc:
+            LOGGER.exception("Application initialization failed.")
+            return ApiResponse(success=False, message=str(exc), data=None).to_dict()
+
+        startup_notification = None
+        if not self._startup_cleanup_completed:
+            try:
+                startup_notification = self._run_startup_cleanup()
+            finally:
+                self._startup_cleanup_completed = True
+
+        app_info = self.get_app_info()
+        menu_definitions = self.get_menu_definitions()
+        initialize_result = self.initialize_app()
+
+        return ApiResponse(
+            success=True,
+            message="Application initialized.",
+            data={
+                "app": initialize_result.get("data"),
+                "appInfo": app_info.get("data"),
+                "menus": menu_definitions.get("data"),
+                "startupNotification": startup_notification,
             },
         ).to_dict()
 
@@ -182,3 +221,27 @@ class AppApi:
         if not webview.windows:
             return None
         return webview.windows[0]
+
+    def _run_startup_cleanup(self) -> dict[str, Any] | None:
+        """起動時整合性確認を同期実行し、必要時のみ通知情報を返す。"""
+
+        if self._cleanup_service is None:
+            raise RuntimeError("Startup cleanup service is not initialized.")
+
+        try:
+            deleted_count = self._cleanup_service.cleanup_missing_files()
+        except Exception:
+            LOGGER.exception("Startup cleanup failed.")
+            return {
+                "type": "error",
+                "message": "ファイル状態確認の実行中にエラーが発生しました",
+            }
+
+        if deleted_count < 1:
+            return None
+
+        return {
+            "type": "info",
+            "title": "ファイル状態確認が完了しました",
+            "message": f"存在しないファイルの登録情報を {deleted_count} 件削除しました",
+        }

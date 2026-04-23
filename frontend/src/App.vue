@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
+import LoadingOverlay from './components/common/LoadingOverlay.vue'
 import MainLayout from './components/layout/MainLayout.vue'
 import Home from './pages/Home.vue'
 import SamplePage from './pages/SamplePage.vue'
@@ -19,6 +20,10 @@ const activePageKey = ref('home')
 const menus = ref(fallbackMenus)
 const appInfo = ref(null)
 const apiResult = ref(null)
+const startupNotification = ref(null)
+const toasts = ref([])
+const isStartupLocked = ref(false)
+const startupOverlayMessage = ref('起動処理を完了しています。しばらくお待ちください。')
 const status = ref({
   type: 'secondary',
   message: '起動準備中',
@@ -30,33 +35,66 @@ function setStatus(type, message) {
   status.value = { type, message }
 }
 
-async function loadInitialData() {
-  setStatus('info', 'Python API に接続中')
-
-  const initResult = await callBackendApi('initialize')
-  apiResult.value = initResult
-
-  if (!initResult.success) {
-    setStatus('warning', initResult.message)
+function showToast(notification) {
+  if (!notification?.message) {
     return
   }
 
-  const [appInfoResult, menuResult] = await Promise.all([
-    callBackendApi('get_app_info'),
-    callBackendApi('get_menu_definitions'),
-  ])
-
-  apiResult.value = appInfoResult
-
-  if (appInfoResult.success) {
-    appInfo.value = appInfoResult.data
+  const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`
+  const item = {
+    id,
+    type: notification.type === 'error' ? 'danger' : 'info',
+    title: notification.title ?? '',
+    message: notification.message,
   }
 
-  if (menuResult.success && Array.isArray(menuResult.data)) {
-    menus.value = menuResult.data
+  toasts.value = [...toasts.value, item]
+  window.setTimeout(() => {
+    toasts.value = toasts.value.filter((toast) => toast.id !== id)
+  }, 6000)
+}
+
+function waitForNextPaint() {
+  return new Promise((resolve) => {
+    window.requestAnimationFrame(() => resolve())
+  })
+}
+
+async function loadInitialData() {
+  setStatus('info', 'Python API に接続中')
+  isStartupLocked.value = true
+  startupOverlayMessage.value = 'ファイル状態確認中です...'
+  await nextTick()
+  await waitForNextPaint()
+
+  try {
+    const initResult = await callBackendApi('initialize')
+    apiResult.value = initResult
+
+    if (!initResult.success) {
+      setStatus('warning', initResult.message)
+      startupNotification.value = {
+        type: 'error',
+        message: 'ファイル状態確認の実行中にエラーが発生しました',
+      }
+      return
+    }
+
+    const appData = initResult.data ?? {}
+    appInfo.value = appData.appInfo ?? null
+    if (Array.isArray(appData.menus)) {
+      menus.value = appData.menus
+    }
+    startupNotification.value = appData.startupNotification ?? null
+
+    setStatus('success', '起動処理が完了しました')
+  } finally {
+    isStartupLocked.value = false
   }
 
-  setStatus('success', 'Python API 接続済み')
+  if (startupNotification.value) {
+    showToast(startupNotification.value)
+  }
 }
 
 async function runHealthCheck() {
@@ -90,5 +128,21 @@ onMounted(loadInitialData)
       @health-check="runHealthCheck"
     />
   </MainLayout>
+  <LoadingOverlay
+    :show="isStartupLocked"
+    title="ファイル状態確認中です..."
+    :message="startupOverlayMessage"
+  />
+  <div class="toast-stack" aria-live="polite" aria-atomic="true">
+    <div
+      v-for="toast in toasts"
+      :key="toast.id"
+      class="toast-card shadow-sm"
+      :class="`toast-card-${toast.type}`"
+      role="status"
+    >
+      <p v-if="toast.title" class="toast-card-title mb-1">{{ toast.title }}</p>
+      <p class="mb-0">{{ toast.message }}</p>
+    </div>
+  </div>
 </template>
-

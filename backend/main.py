@@ -118,12 +118,6 @@ def main() -> int:
         return 1
 
     api = AppApi()
-    try:
-        api.initialize_app_backend()
-    except Exception as exc:
-        print(f"Application initialization failed: {exc}", file=sys.stderr)
-        api.close()
-        return 1
 
     window = webview.create_window(
         APP_TITLE,
