@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from backend.repositories import ImageFileRepository
-from backend.services import StartupCleanupService
+from backend.services import StartupCleanupService, ThumbnailCacheService
 
 from .api_response import ApiResponse
 from .default_template_api import DefaultTemplateApi
@@ -22,12 +22,14 @@ class AppLifeCycleApi:
         service_manager: ServiceManager,
         default_template_api: DefaultTemplateApi,
         image_catalog_api: ImageCatalogApi,
+        thumbnail_cache_service: ThumbnailCacheService,
     ) -> None:
         """起動時に利用するサービス管理と基本APIを保持する。"""
 
         self._service_manager = service_manager
         self._default_template_api = default_template_api
         self._image_catalog_api = image_catalog_api
+        self._thumbnail_cache_service = thumbnail_cache_service
         self._startup_cleanup_completed = False
         self._repository: ImageFileRepository | None = None
         self._cleanup_service: StartupCleanupService | None = None
@@ -50,6 +52,7 @@ class AppLifeCycleApi:
         if not self._startup_cleanup_completed:
             try:
                 startup_notification = self._run_startup_cleanup()
+                self._ensure_thumbnail_cache()
             finally:
                 self._startup_cleanup_completed = True
 
@@ -113,5 +116,26 @@ class AppLifeCycleApi:
         connection = self._service_manager.get_connection()
         self._repository = ImageFileRepository(connection)
         self._repository.create_table()
-        self._cleanup_service = StartupCleanupService(connection, self._repository)
+        self._cleanup_service = StartupCleanupService(
+            connection,
+            self._repository,
+            self._thumbnail_cache_service,
+        )
         return self._cleanup_service
+
+    def _ensure_thumbnail_cache(self) -> None:
+        """既存レコードに対する不足サムネイルを補完する。"""
+
+        items = self._get_cleanup_repository().find_all_items()
+        self._thumbnail_cache_service.ensure_thumbnails(items)
+
+    def _get_cleanup_repository(self) -> ImageFileRepository:
+        """起動時整合性確認と同じリポジトリを返す。"""
+
+        if self._repository is not None:
+            return self._repository
+
+        connection = self._service_manager.get_connection()
+        self._repository = ImageFileRepository(connection)
+        self._repository.create_table()
+        return self._repository

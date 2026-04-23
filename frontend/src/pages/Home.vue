@@ -120,19 +120,6 @@ function toggleFlag(item, field, event) {
       <div class="small text-secondary">
         {{ searchResult.page }} / {{ searchResult.total_pages }} ページ
       </div>
-      <div class="btn-group btn-group-sm">
-        <button
-          v-for="page in visiblePages"
-          :key="`top-${page}`"
-          type="button"
-          class="btn"
-          :class="page === searchResult.page ? 'btn-primary' : 'btn-outline-primary'"
-          :disabled="isSearching"
-          @click="$emit('change-page', page)"
-        >
-          {{ page }}
-        </button>
-      </div>
     </div>
 
     <div v-if="(searchResult.total_count ?? 0) === 0" class="card">

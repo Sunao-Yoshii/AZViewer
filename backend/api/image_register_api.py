@@ -3,7 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from backend.repositories import ImageFileRepository
-from backend.services import DialogService, FileScanService, ImageFileImportService
+from backend.services import (
+    DialogService,
+    FileScanService,
+    ImageFileImportService,
+    ThumbnailCacheService,
+)
 
 from .api_response import ApiResponse
 from .service_manager import ServiceManager
@@ -16,11 +21,13 @@ class ImageRegisterApi:
         self,
         service_manager: ServiceManager,
         window_provider,
+        thumbnail_cache_service: ThumbnailCacheService,
     ) -> None:
         """利用するサービス管理と画像登録系サービスを保持する。"""
 
         self._service_manager = service_manager
         self._dialog_service = DialogService(window_provider)
+        self._thumbnail_cache_service = thumbnail_cache_service
         self._repository: ImageFileRepository | None = None
         self._import_service: ImageFileImportService | None = None
 
@@ -37,6 +44,7 @@ class ImageRegisterApi:
             connection,
             self._repository,
             FileScanService(),
+            self._thumbnail_cache_service,
         )
         return self._import_service
 

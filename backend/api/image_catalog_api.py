@@ -1,23 +1,26 @@
 from __future__ import annotations
 
 import base64
-import mimetypes
-from pathlib import Path
 from typing import Any
 
 from backend.repositories import ImageFileRepository
+from backend.services import ThumbnailCacheService
 
 from .api_response import ApiResponse
 from .service_manager import ServiceManager
 
-
 class ImageCatalogApi:
     """画像一覧表示・検索・更新系APIを提供する。"""
 
-    def __init__(self, service_manager: ServiceManager) -> None:
+    def __init__(
+        self,
+        service_manager: ServiceManager,
+        thumbnail_cache_service: ThumbnailCacheService,
+    ) -> None:
         """利用するサービス管理と一覧用リポジトリを保持する。"""
 
         self._service_manager = service_manager
+        self._thumbnail_cache_service = thumbnail_cache_service
         self._repository: ImageFileRepository | None = None
 
     def search_image_files(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -64,39 +67,23 @@ class ImageCatalogApi:
 
     def fetchLocalImageThumb(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """ローカル画像の表示用データURLを返す。"""
-
         data = payload if isinstance(payload, dict) else {}
         try:
             record_id = int(data.get("id"))
         except (TypeError, ValueError):
-            print("Invalid id value:", data.get("id"))
             return ApiResponse(success=False, message="id is required.", data=None).to_dict()
 
-        item = self._get_repository().find_by_id(record_id)
-        if item is None:
-            print("Image file not found:", record_id)
+        binary = self._thumbnail_cache_service.get_thumbnail_bytes(record_id)
+        if binary is None:
             return ApiResponse(success=False, message="Image file was not found.", data=None).to_dict()
-
-        image_path = Path(item.path)
-        if not image_path.is_file():
-            print("Image file is not a valid file:", image_path)
-            return ApiResponse(success=False, message="Image file was not found.", data=None).to_dict()
-
-        try:
-            binary = image_path.read_bytes()
-        except OSError as exc:
-            print("Error reading image file:", exc)
-            return ApiResponse(success=False, message=str(exc), data=None).to_dict()
-
-        content_type = mimetypes.guess_type(image_path.name)[0] or "application/octet-stream"
         encoded = base64.b64encode(binary).decode("ascii")
         return ApiResponse(
             success=True,
             message="Image thumbnail loaded.",
             data={
                 "id": record_id,
-                "contentType": content_type,
-                "dataUrl": f"data:{content_type};base64,{encoded}",
+                "contentType": "image/png",
+                "dataUrl": f"data:image/png;base64,{encoded}",
             },
         ).to_dict()
 

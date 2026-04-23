@@ -4,5 +4,15 @@ import 'bootstrap-icons/font/bootstrap-icons.css'
 import './styles/app.css'
 import App from './App.vue'
 
-createApp(App).mount('#app')
+function preventFileDropDefaults(event) {
+  event.preventDefault()
+  if (event.dataTransfer) {
+    event.dataTransfer.dropEffect = 'copy'
+  }
+}
 
+window.addEventListener('dragenter', preventFileDropDefaults)
+window.addEventListener('dragover', preventFileDropDefaults)
+window.addEventListener('drop', preventFileDropDefaults)
+
+createApp(App).mount('#app')

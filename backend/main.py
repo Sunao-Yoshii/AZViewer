@@ -74,11 +74,6 @@ def create_drop_items(event: dict[str, Any]) -> list[dict[str, str]]:
 def register_handlers(window: object, api: AppApi) -> None:
     """pywebviewのDOMイベントにドラッグ＆ドロップ処理を登録する。"""
 
-    def on_drag(event: dict[str, Any]) -> None:
-        """ドラッグ中のイベントを受け取り、発生したイベント種別をログ出力する。"""
-
-        print(f"Event: {event.get('type', 'drag')}")
-
     def on_drop(event: dict[str, Any]) -> None:
         """ドロップされたファイルまたはフォルダを既存の登録処理へ渡す。"""
 
@@ -109,11 +104,7 @@ def register_handlers(window: object, api: AppApi) -> None:
 
         print(f"Drop import failed: {result.get('message', '')}", file=sys.stderr)
 
-    window.dom.document.events.dragenter += DOMEventHandler(on_drag, True, True)
-    window.dom.document.events.dragstart += DOMEventHandler(on_drag, True, True)
-    window.dom.document.events.dragover += DOMEventHandler(on_drag, True, True, debounce=500)
     window.dom.document.events.drop += DOMEventHandler(on_drop, True, True)
-    # window.dom.document.events.load += DOMEventHandler(lambda _: api.bootstrap_app(), True, True)
 
 
 def main() -> int:

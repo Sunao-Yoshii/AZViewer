@@ -39,16 +39,39 @@ class ImageFileRepository:
         rows = self._connection.execute("SELECT path FROM image_file_data").fetchall()
         return [str(row["path"]) for row in rows]
 
-    def delete_by_paths(self, paths: list[str]) -> None:
-        """指定されたパスに一致する画像ファイル情報を削除する。"""
+    def find_all_items(self) -> list[ImageFileListItem]:
+        """登録済み画像ファイル情報を全件取得する。"""
+
+        rows = self._connection.execute(
+            """
+            SELECT
+                id,
+                filename,
+                path,
+                folder,
+                rating,
+                is_checked,
+                is_favorite,
+                comment
+            FROM image_file_data
+            ORDER BY id DESC
+            """
+        ).fetchall()
+        return [self._row_to_item(row) for row in rows]
+
+    def delete_by_paths(self, paths: list[str]) -> list[int]:
+        """指定されたパスに一致する画像ファイル情報を削除し、削除IDを返す。"""
 
         if not paths:
-            return
+            return []
+
+        record_ids = self.find_ids_by_paths(paths)
 
         self._connection.executemany(
             "DELETE FROM image_file_data WHERE path = ?",
             [(path,) for path in paths],
         )
+        return record_ids
 
     def insert_many(self, records: list[ImageFileRecord]) -> None:
         """複数の画像ファイル情報を一括登録する。"""
@@ -91,6 +114,44 @@ class ImageFileRepository:
             (path,),
         ).fetchone()
         return row is not None
+
+    def find_by_paths(self, paths: list[str]) -> list[ImageFileListItem]:
+        """指定パス群に一致する画像ファイル情報を取得する。"""
+
+        if not paths:
+            return []
+
+        placeholders = ", ".join("?" for _ in paths)
+        rows = self._connection.execute(
+            f"""
+            SELECT
+                id,
+                filename,
+                path,
+                folder,
+                rating,
+                is_checked,
+                is_favorite,
+                comment
+            FROM image_file_data
+            WHERE path IN ({placeholders})
+            """,
+            paths,
+        ).fetchall()
+        return [self._row_to_item(row) for row in rows]
+
+    def find_ids_by_paths(self, paths: list[str]) -> list[int]:
+        """指定パス群に一致するレコードID一覧を取得する。"""
+
+        if not paths:
+            return []
+
+        placeholders = ", ".join("?" for _ in paths)
+        rows = self._connection.execute(
+            f"SELECT id FROM image_file_data WHERE path IN ({placeholders})",
+            paths,
+        ).fetchall()
+        return [int(row["id"]) for row in rows]
 
     def search(
         self,
