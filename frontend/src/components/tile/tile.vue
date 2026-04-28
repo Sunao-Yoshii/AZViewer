@@ -1,7 +1,10 @@
 <script setup>
+import { ref, watch } from 'vue'
 import placeholderUrl from '../../assets/images/placeholder.svg'
+import TileDisplay from './display.vue'
+import TileEdit from './edit.vue'
 
-defineProps({
+const props = defineProps({
   item: {
     type: Object,
     required: true,
@@ -12,7 +15,20 @@ defineProps({
   },
 })
 
-defineEmits(['open-detail', 'request-delete'])
+const emit = defineEmits(['open-detail', 'request-delete', 'save-detail'])
+
+const isEditing = ref(false)
+
+watch(
+  () => props.item,
+  () => {
+    isEditing.value = false
+  }
+)
+
+function handleSave(payload) {
+  emit('save-detail', payload)
+}
 </script>
 
 <template>
@@ -36,17 +52,17 @@ defineEmits(['open-detail', 'request-delete'])
       <div class="image-tile-folder small text-secondary text-truncate" :title="item.folder">
         {{ item.folder }}
       </div>
-      <div class="d-flex flex-wrap gap-1 mt-2">
-        <span class="badge text-bg-secondary">{{ item.rating }}</span>
-        <span :class="item.is_checked === 1 ? 'badge bg-primary' : 'badge bg-secondary'">
-          チェック
-        </span>
-        <span :class="item.is_favorite === 1 ? 'badge bg-warning text-dark' : 'badge bg-secondary'">
-          お気に入り
-        </span>
-      </div>
-
-      <div class="image-tile-comment small mt-2">{{ item.comment || '-' }}</div>
+      <TileEdit
+        v-if="isEditing"
+        :item="item"
+        @cancel="isEditing = false"
+        @save="handleSave"
+      />
+      <TileDisplay
+        v-else
+        :item="item"
+        @edit="isEditing = true"
+      />
     </div>
   </article>
 </template>

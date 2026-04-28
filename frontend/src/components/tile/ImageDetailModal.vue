@@ -68,8 +68,8 @@ function handleSave() {
       aria-modal="true"
       aria-labelledby="imageDetailTitle"
     >
-      <div class="modal-dialog modal-xl modal-dialog-centered">
-        <div class="modal-content">
+      <div class="modal-dialog modal-xl modal-dialog-centered image-detail-dialog">
+        <div class="modal-content image-detail-content">
           <div class="modal-header">
             <h1 id="imageDetailTitle" class="modal-title fs-5 text-truncate">
               {{ item.filename }}

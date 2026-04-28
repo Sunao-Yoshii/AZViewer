@@ -13,7 +13,14 @@ defineProps({
   },
 })
 
-defineEmits(['change-page', 'change-page-size', 'change-sort', 'open-detail', 'request-delete'])
+defineEmits([
+  'change-page',
+  'change-page-size',
+  'change-sort',
+  'open-detail',
+  'request-delete',
+  'save-detail',
+])
 
 const sortOptions = [
   { label: '登録の新しい順', value: 'id_desc' },
@@ -75,6 +82,7 @@ const pageSizeOptions = [25, 50, 75, 100]
         :is-searching="isSearching"
         @open-detail="$emit('open-detail', $event)"
         @request-delete="$emit('request-delete', $event)"
+        @save-detail="$emit('save-detail', $event)"
       />
     </div>
 

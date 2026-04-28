@@ -8,6 +8,7 @@ from PIL import Image, ImageOps
 from backend.models import ImageFileListItem
 
 LOGGER = logging.getLogger(__name__)
+THUMBNAIL_SIZE = 200
 
 
 class ThumbnailCacheService:
@@ -40,7 +41,7 @@ class ThumbnailCacheService:
 
         with Image.open(source) as image:
             normalized = ImageOps.exif_transpose(image).convert("RGBA")
-            normalized.thumbnail((150, 150), Image.Resampling.LANCZOS)
+            normalized.thumbnail((THUMBNAIL_SIZE, THUMBNAIL_SIZE), Image.Resampling.LANCZOS)
             normalized.save(thumb_path, format="PNG")
 
     def delete_thumbnails(self, record_ids: list[int]) -> None:

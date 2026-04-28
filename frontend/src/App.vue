@@ -272,6 +272,7 @@ onBeforeUnmount(() => {
       @change-sort="handleSortChange"
       @open-detail="handleOpenDetail"
       @request-delete="handleDelete"
+      @save-detail="handleSaveDetail"
     />
   </MainLayout>
   <ImageDetailModal

@@ -158,14 +158,15 @@ body {
 
 .image-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, 150px);
+  grid-template-columns: repeat(auto-fill, 200px);
   gap: 1rem;
   align-content: start;
 }
 
+.card.image-tile,
 .image-tile {
   position: relative;
-  width: 150px;
+  width: 200px;
 }
 
 .image-tile-delete {
@@ -179,8 +180,8 @@ body {
 }
 
 .image-tile-thumb {
-  width: 150px;
-  height: 150px;
+  width: 200px;
+  height: 200px;
   object-fit: contain;
   background: #f8f9fa;
   border-bottom: 1px solid #dee2e6;
@@ -208,17 +209,37 @@ body {
   padding-top: 0.35rem;
 }
 
+.image-tile-edit {
+  font-size: 0.875rem;
+}
+
+.image-tile-rating,
+.image-tile-switch {
+  min-height: 1.35rem;
+}
+
+.image-detail-dialog {
+  max-height: 90vh;
+}
+
+.image-detail-content {
+  max-height: 90vh;
+}
+
 .image-detail-body {
   display: grid;
   grid-template-columns: minmax(0, 4fr) minmax(14rem, 1fr);
   gap: 1rem;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .image-detail-preview {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 20rem;
+  min-height: 0;
+  max-height: calc(90vh - 140px);
   overflow: auto;
   background: #f8f9fa;
   border: 1px solid #dee2e6;
@@ -227,7 +248,7 @@ body {
 
 .image-detail-image {
   max-width: 100%;
-  max-height: calc(100vh - 200px);
+  max-height: 100%;
   object-fit: contain;
   cursor: zoom-in;
 }
@@ -359,5 +380,6 @@ body {
 
   .image-detail-body {
     grid-template-columns: 1fr;
+    overflow: auto;
   }
 }
