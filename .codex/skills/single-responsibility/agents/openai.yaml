@@ -1,0 +1,4 @@
+interface:
+  display_name: "Single Responsibility"
+  short_description: "Keep code changes focused by responsibility"
+  default_prompt: "Use $single-responsibility to refactor this code so each unit has one clear responsibility."

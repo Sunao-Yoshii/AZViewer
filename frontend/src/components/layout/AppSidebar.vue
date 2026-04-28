@@ -70,7 +70,7 @@ const ratingOptions = [
             type="checkbox"
             :disabled="isBusy"
           />
-          <label class="form-check-label small" for="searchChecked">確認済みのみ</label>
+          <label class="form-check-label small" for="searchChecked">チェック済みのみ</label>
         </div>
 
         <div class="form-check">

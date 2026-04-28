@@ -1,0 +1,4 @@
+interface:
+  display_name: "Stepwise Functions"
+  short_description: "Split long Python and JavaScript functions"
+  default_prompt: "Use $stepwise-functions when implementing Python or JavaScript functions so long flows are split into step-level helpers."

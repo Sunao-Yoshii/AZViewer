@@ -1,8 +1,8 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import LoadingOverlay from './components/common/LoadingOverlay.vue'
+import Content from './components/layout/Content.vue'
 import MainLayout from './components/layout/MainLayout.vue'
-import Home from './pages/Home.vue'
 import {
   callBackendApi,
   searchImageFiles,
@@ -248,7 +248,7 @@ onBeforeUnmount(() => {
     @search="handleSearch"
     @import-complete="handleImportComplete"
   >
-    <Home
+    <Content
       :search-result="searchResult"
       :is-searching="isSearching"
       @change-page="handlePageChange"
