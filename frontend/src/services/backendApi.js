@@ -1,37 +1,41 @@
-function createUnavailableResponse(methodName) {
-  return {
-    success: false,
-    message: `Python API is not available: ${methodName}`,
-    data: null,
-  }
-}
-
-function waitForPywebviewApi(timeoutMs = 1500) {
-  if (window.pywebview?.api) {
-    return Promise.resolve(window.pywebview.api)
-  }
-
+function waitForNextApiCheck() {
   return new Promise((resolve) => {
-    const timerId = window.setTimeout(() => {
+    const finish = () => {
+      window.clearTimeout(timerId)
       document.removeEventListener('pywebviewready', handleReady)
-      resolve(null)
-    }, timeoutMs)
+      resolve()
+    }
+
+    const timerId = window.setTimeout(finish, 50)
 
     function handleReady() {
-      window.clearTimeout(timerId)
-      resolve(window.pywebview?.api ?? null)
+      finish()
     }
 
     document.addEventListener('pywebviewready', handleReady, { once: true })
   })
 }
 
-export async function callBackendApi(methodName, ...args) {
-  const api = await waitForPywebviewApi()
-
+function getCallableBackendApi(methodName) {
+  const api = window.pywebview?.api
   if (!api || typeof api[methodName] !== 'function') {
-    return createUnavailableResponse(methodName)
+    return null
   }
+
+  return api
+}
+
+async function waitForPywebviewApi(methodName) {
+  let api = getCallableBackendApi(methodName)
+  while (!api) {
+    await waitForNextApiCheck()
+    api = getCallableBackendApi(methodName)
+  }
+  return api
+}
+
+export async function callBackendApi(methodName, ...args) {
+  const api = await waitForPywebviewApi(methodName)
 
   try {
     return await api[methodName](...args)
