@@ -224,17 +224,38 @@ class ImageFileRepository:
             page_size=safe_page_size,
         )
 
-    def update_flag(self, record_id: int, field: str, value: int) -> bool:
-        """指定レコードのフラグ項目を更新する。"""
-
-        if field not in {"is_checked", "is_favorite"}:
-            raise ValueError("field must be 'is_checked' or 'is_favorite'.")
-        if value not in {0, 1}:
-            raise ValueError("value must be 0 or 1.")
+    def delete_by_id(self, record_id: int) -> bool:
+        """IDに一致する画像ファイル情報を削除する。"""
 
         cursor = self._connection.execute(
-            f"UPDATE image_file_data SET {field} = ? WHERE id = ?",
-            (value, record_id),
+            "DELETE FROM image_file_data WHERE id = ?",
+            (record_id,),
+        )
+        self._connection.commit()
+        return cursor.rowcount > 0
+
+    def update_detail(
+        self,
+        record_id: int,
+        rating: str,
+        is_checked: int,
+        is_favorite: int,
+        comment: str | None,
+    ) -> bool:
+        """指定レコードの詳細項目を一括更新する。"""
+
+        self._validate_detail_values(rating, is_checked, is_favorite)
+        cursor = self._connection.execute(
+            """
+            UPDATE image_file_data
+            SET
+                rating = ?,
+                is_checked = ?,
+                is_favorite = ?,
+                comment = ?
+            WHERE id = ?
+            """,
+            (rating, is_checked, is_favorite, comment, record_id),
         )
         self._connection.commit()
         return cursor.rowcount > 0
@@ -298,3 +319,13 @@ class ImageFileRepository:
         if isinstance(value, bool):
             return value
         return int(value) == 1
+
+    def _validate_detail_values(self, rating: str, is_checked: int, is_favorite: int) -> None:
+        """詳細更新で許可する値か検証する。"""
+
+        if rating not in {"General", "R-15", "R-18", "R-18G"}:
+            raise ValueError("rating is invalid.")
+        if is_checked not in {0, 1}:
+            raise ValueError("is_checked must be 0 or 1.")
+        if is_favorite not in {0, 1}:
+            raise ValueError("is_favorite must be 0 or 1.")

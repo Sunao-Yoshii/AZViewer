@@ -86,10 +86,20 @@ class AppApi:
 
         return self._image_catalog_api.search_image_files(payload)
 
-    def update_image_file_flags(self, payload: dict[str, object]) -> dict[str, object]:
-        """指定レコードのフラグを更新する。"""
+    def update_image_file_detail(self, payload: dict[str, object]) -> dict[str, object]:
+        """指定レコードの詳細項目を一括更新する。"""
 
-        return self._image_catalog_api.update_image_file_flags(payload)
+        return self._image_catalog_api.update_image_file_detail(payload)
+
+    def delete_image_file(self, payload: dict[str, object]) -> dict[str, object]:
+        """指定レコードを削除する。"""
+
+        return self._image_catalog_api.delete_image_file(payload)
+
+    def fetchLocalImage(self, payload: dict[str, object]) -> dict[str, object]:
+        """ローカル画像の本体を表示用データURLとして返す。"""
+
+        return self._image_catalog_api.fetchLocalImage(payload)
 
     def fetchLocalImageThumb(self, payload: dict[str, object]) -> dict[str, object]:
         """ローカル画像の表示用データURL1を返す。"""

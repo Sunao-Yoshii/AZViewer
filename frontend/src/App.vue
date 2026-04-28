@@ -3,10 +3,15 @@ import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import LoadingOverlay from './components/common/LoadingOverlay.vue'
 import Content from './components/layout/Content.vue'
 import MainLayout from './components/layout/MainLayout.vue'
+import ImageDetailModal from './components/tile/ImageDetailModal.vue'
+import placeholderUrl from './assets/images/placeholder.svg'
 import {
   callBackendApi,
+  deleteImageFile,
+  fetchLocalImage,
+  fetchLocalImageThumb,
   searchImageFiles,
-  updateImageFileFlags,
+  updateImageFileDetail,
 } from './services/backendApi'
 
 const appInfo = ref(null)
@@ -32,6 +37,10 @@ const isOverlayVisible = ref(false)
 const overlayTitle = ref('ファイル状態確認中です...')
 const overlayMessage = ref('起動処理を完了しています。しばらくお待ちください。')
 const isSearching = ref(false)
+const selectedDetailItem = ref(null)
+const detailImageUrl = ref('')
+const isDetailImageLoading = ref(false)
+const isSavingDetail = ref(false)
 const status = ref({
   type: 'secondary',
   message: '起動準備中',
@@ -74,7 +83,8 @@ function normalizeSearchPayload(overrides = {}) {
   }
 }
 
-function applySearchResult(data, appliedPayload) {
+async function applySearchResult(data, appliedPayload) {
+  const items = await addThumbnailUrls(data.items ?? [])
   searchFilters.value = {
     ...searchFilters.value,
     path: appliedPayload.path ?? '',
@@ -87,8 +97,21 @@ function applySearchResult(data, appliedPayload) {
   }
   searchResult.value = {
     ...data,
+    items,
     sort: appliedPayload.sort ?? 'id_desc',
   }
+}
+
+async function addThumbnailUrls(items) {
+  return await Promise.all(items.map(addThumbnailUrl))
+}
+
+async function addThumbnailUrl(item) {
+  const result = await fetchLocalImageThumb(item.id)
+  if (!result.success) {
+    return { ...item, thumbnailUrl: placeholderUrl }
+  }
+  return { ...item, thumbnailUrl: result.data?.dataUrl || placeholderUrl }
 }
 
 async function executeSearch(overrides = {}, overlay = false) {
@@ -106,7 +129,7 @@ async function executeSearch(overrides = {}, overlay = false) {
       pushToast({ type: 'error', message: result.message || '検索に失敗しました。' })
       return false
     }
-    applySearchResult(result.data ?? {}, payload)
+    await applySearchResult(result.data ?? {}, payload)
     return true
   } finally {
     isSearching.value = false
@@ -144,7 +167,7 @@ async function loadInitialData() {
     pushToast(data.startupNotification)
   }
   if (data.initialSearchResult) {
-    applySearchResult(data.initialSearchResult, normalizeSearchPayload())
+    await applySearchResult(data.initialSearchResult, normalizeSearchPayload())
   }
   setStatus('success', '起動処理が完了しました')
   isOverlayVisible.value = false
@@ -170,59 +193,52 @@ async function handleSortChange(sort) {
   await executeSearch({ page: 1, sort }, true)
 }
 
-function matchesCurrentFilters(item) {
-  if (searchFilters.value.is_checked && item.is_checked !== 1) {
-    return false
+async function handleOpenDetail(item) {
+  selectedDetailItem.value = item
+  detailImageUrl.value = ''
+  isDetailImageLoading.value = true
+
+  const result = await fetchLocalImage(item.path)
+  isDetailImageLoading.value = false
+  if (!result.success) {
+    pushToast({ type: 'error', message: result.message || '画像を読み込めませんでした。' })
+    return
   }
-  if (searchFilters.value.is_favorite && item.is_favorite !== 1) {
-    return false
-  }
-  if (searchFilters.value.rating && item.rating !== searchFilters.value.rating) {
-    return false
-  }
-  if (
-    searchFilters.value.path &&
-    !String(item.path).toLowerCase().includes(searchFilters.value.path.toLowerCase())
-  ) {
-    return false
-  }
-  return true
+  detailImageUrl.value = result.data?.dataUrl ?? ''
 }
 
-async function handleFlagUpdate(payload) {
-  const originalItems = searchResult.value.items.map((item) => ({ ...item }))
-  const nextItems = searchResult.value.items
-    .map((item) => {
-      if (item.id !== payload.id) {
-        return item
-      }
-      return { ...item, [payload.field]: payload.value }
-    })
-    .filter(matchesCurrentFilters)
+function handleCloseDetail() {
+  selectedDetailItem.value = null
+  detailImageUrl.value = ''
+  isDetailImageLoading.value = false
+}
 
-  const removedCount = searchResult.value.items.length - nextItems.length
-  const nextTotalCount = Math.max(0, searchResult.value.total_count - removedCount)
-  searchResult.value = {
-    ...searchResult.value,
-    items: nextItems,
-    total_count: nextTotalCount,
-    total_pages:
-      nextTotalCount > 0
-        ? Math.ceil(nextTotalCount / searchResult.value.page_size)
-        : 0,
-  }
-
-  const result = await updateImageFileFlags(payload)
-  if (result.success) {
+async function handleDelete(id) {
+  if (!window.confirm('このアプリケーション上から削除します。よろしいですか？')) {
     return
   }
 
-  searchResult.value = {
-    ...searchResult.value,
-    items: originalItems,
+  const result = await deleteImageFile(id)
+  if (!result.success) {
+    pushToast({ type: 'error', message: result.message || '削除に失敗しました。' })
+    return
   }
-  pushToast({ type: 'error', message: 'フラグ更新に失敗しました。一覧を再取得します。' })
   await executeSearch({}, true)
+}
+
+async function handleSaveDetail(payload) {
+  isSavingDetail.value = true
+  try {
+    const result = await updateImageFileDetail(payload)
+    if (!result.success) {
+      pushToast({ type: 'error', message: result.message || '詳細の保存に失敗しました。' })
+      return
+    }
+    handleCloseDetail()
+    await executeSearch({}, true)
+  } finally {
+    isSavingDetail.value = false
+  }
 }
 
 function handleImportedEvent() {
@@ -254,9 +270,18 @@ onBeforeUnmount(() => {
       @change-page="handlePageChange"
       @change-page-size="handlePageSizeChange"
       @change-sort="handleSortChange"
-      @update-flag="handleFlagUpdate"
+      @open-detail="handleOpenDetail"
+      @request-delete="handleDelete"
     />
   </MainLayout>
+  <ImageDetailModal
+    :item="selectedDetailItem"
+    :image-url="detailImageUrl"
+    :is-loading-image="isDetailImageLoading"
+    :is-saving="isSavingDetail"
+    @close="handleCloseDetail"
+    @save="handleSaveDetail"
+  />
   <LoadingOverlay
     :show="isOverlayVisible"
     :title="overlayTitle"

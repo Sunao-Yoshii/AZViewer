@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import base64
+import mimetypes
+from pathlib import Path
 from typing import Any
 
 from backend.repositories import ImageFileRepository
@@ -43,15 +45,13 @@ class ImageCatalogApi:
             data=result.to_dict(),
         ).to_dict()
 
-    def update_image_file_flags(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        """指定レコードのフラグを更新する。"""
+    def update_image_file_detail(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定レコードの詳細項目を一括更新する。"""
 
         data = payload if isinstance(payload, dict) else {}
         try:
-            record_id = int(data.get("id"))
-            field = str(data.get("field") or "")
-            value = int(data.get("value"))
-            updated = self._get_repository().update_flag(record_id, field, value)
+            detail = self._normalize_detail_payload(data)
+            updated = self._get_repository().update_detail(**detail)
         except (TypeError, ValueError) as exc:
             return ApiResponse(success=False, message=str(exc), data=None).to_dict()
         except Exception as exc:
@@ -62,8 +62,49 @@ class ImageCatalogApi:
 
         return ApiResponse(
             success=True,
-            message="Flags updated.",
-            data={"id": record_id, "field": field, "value": value},
+            message="Image file detail updated.",
+            data=detail,
+        ).to_dict()
+
+    def delete_image_file(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定レコードを削除し、対応するサムネイルを削除する。"""
+
+        data = payload if isinstance(payload, dict) else {}
+        try:
+            record_id = int(data.get("id"))
+        except (TypeError, ValueError):
+            return ApiResponse(success=False, message="id is required.", data=None).to_dict()
+
+        deleted = self._get_repository().delete_by_id(record_id)
+        if not deleted:
+            return ApiResponse(success=False, message="対象データが存在しません。", data=None).to_dict()
+
+        self._thumbnail_cache_service.delete_thumbnail(record_id)
+        return ApiResponse(
+            success=True,
+            message="Image file deleted.",
+            data={"id": record_id},
+        ).to_dict()
+
+    def fetchLocalImage(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """ローカル画像の本体を表示用データURLとして返す。"""
+
+        data = payload if isinstance(payload, dict) else {}
+        path = Path(str(data.get("path") or "")).expanduser()
+        if not path.is_file():
+            return ApiResponse(success=False, message="Image file was not found.", data=None).to_dict()
+
+        binary = path.read_bytes()
+        content_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+        encoded = base64.b64encode(binary).decode("ascii")
+        return ApiResponse(
+            success=True,
+            message="Image loaded.",
+            data={
+                "path": str(path),
+                "contentType": content_type,
+                "dataUrl": f"data:{content_type};base64,{encoded}",
+            },
         ).to_dict()
 
     def fetchLocalImageThumb(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -106,3 +147,18 @@ class ImageCatalogApi:
             return None
         normalized = str(value).strip()
         return normalized or None
+
+    def _normalize_detail_payload(self, data: dict[str, Any]) -> dict[str, Any]:
+        """詳細更新ペイロードをリポジトリ用の値へ正規化する。"""
+
+        comment = data.get("comment")
+        if comment is not None:
+            comment = str(comment)
+
+        return {
+            "record_id": int(data.get("id")),
+            "rating": str(data.get("rating") or ""),
+            "is_checked": int(data.get("is_checked")),
+            "is_favorite": int(data.get("is_favorite")),
+            "comment": comment,
+        }

@@ -60,8 +60,16 @@ export async function searchImageFiles(payload) {
   return await callBackendApi('search_image_files', payload)
 }
 
-export async function updateImageFileFlags(payload) {
-  return await callBackendApi('update_image_file_flags', payload)
+export async function updateImageFileDetail(payload) {
+  return await callBackendApi('update_image_file_detail', payload)
+}
+
+export async function deleteImageFile(id) {
+  return await callBackendApi('delete_image_file', { id })
+}
+
+export async function fetchLocalImage(path) {
+  return await callBackendApi('fetchLocalImage', { path })
 }
 
 export async function fetchLocalImageThumb(id) {
