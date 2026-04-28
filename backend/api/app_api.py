@@ -5,10 +5,10 @@ import webview
 from backend.services import ThumbnailCacheService
 
 from .app_lifecycle_api import AppLifeCycleApi
+from .database_lifecycle_manager import DatabaseLifecycleManager
 from .default_template_api import DefaultTemplateApi
 from .image_catalog_api import ImageCatalogApi
 from .image_register_api import ImageRegisterApi
-from .service_manager import ServiceManager
 
 
 class AppApi:
@@ -17,13 +17,13 @@ class AppApi:
     def __init__(self) -> None:
         """内部ロジックごとのAPIクラスを組み立てる。"""
 
-        service_manager = ServiceManager()
+        database_lifecycle_manager = DatabaseLifecycleManager()
         default_template_api = DefaultTemplateApi()
         thumbnail_cache_service = ThumbnailCacheService()
-        image_catalog_api = ImageCatalogApi(service_manager, thumbnail_cache_service)
+        image_catalog_api = ImageCatalogApi(database_lifecycle_manager, thumbnail_cache_service)
 
         self._app_lifecycle_api = AppLifeCycleApi(
-            service_manager,
+            database_lifecycle_manager,
             default_template_api,
             image_catalog_api,
             thumbnail_cache_service,
@@ -31,7 +31,7 @@ class AppApi:
         self._default_template_api = default_template_api
         self._image_catalog_api = image_catalog_api
         self._image_register_api = ImageRegisterApi(
-            service_manager,
+            database_lifecycle_manager,
             self._get_active_window,
             thumbnail_cache_service,
         )

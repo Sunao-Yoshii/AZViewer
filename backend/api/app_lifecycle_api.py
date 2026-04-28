@@ -7,9 +7,9 @@ from backend.repositories import ImageFileRepository
 from backend.services import StartupCleanupService, ThumbnailCacheService
 
 from .api_response import ApiResponse
+from .database_lifecycle_manager import DatabaseLifecycleManager
 from .default_template_api import DefaultTemplateApi
 from .image_catalog_api import ImageCatalogApi
-from .service_manager import ServiceManager
 
 LOGGER = logging.getLogger(__name__)
 
@@ -19,14 +19,14 @@ class AppLifeCycleApi:
 
     def __init__(
         self,
-        service_manager: ServiceManager,
+        database_lifecycle_manager: DatabaseLifecycleManager,
         default_template_api: DefaultTemplateApi,
         image_catalog_api: ImageCatalogApi,
         thumbnail_cache_service: ThumbnailCacheService,
     ) -> None:
-        """起動時に利用するサービス管理と基本APIを保持する。"""
+        """起動時に利用するDB接続管理と基本APIを保持する。"""
 
-        self._service_manager = service_manager
+        self._database_lifecycle_manager = database_lifecycle_manager
         self._default_template_api = default_template_api
         self._image_catalog_api = image_catalog_api
         self._thumbnail_cache_service = thumbnail_cache_service
@@ -43,7 +43,7 @@ class AppLifeCycleApi:
         """初回画面表示後の起動整合性確認を含むアプリ初期化結果を返す。"""
 
         try:
-            self._service_manager.initialize()
+            self._database_lifecycle_manager.initialize()
         except Exception as exc:
             LOGGER.exception("Application initialization failed.")
             return ApiResponse(success=False, message=str(exc), data=None).to_dict()
@@ -84,7 +84,7 @@ class AppLifeCycleApi:
     def close(self) -> None:
         """アプリケーション終了時に保持している接続を閉じる。"""
 
-        self._service_manager.close()
+        self._database_lifecycle_manager.close()
 
     def _run_startup_cleanup(self) -> dict[str, Any] | None:
         """起動時整合性確認を同期実行し、必要時のみ通知情報を返す。"""
@@ -113,7 +113,7 @@ class AppLifeCycleApi:
         if self._cleanup_service is not None:
             return self._cleanup_service
 
-        connection = self._service_manager.get_connection()
+        connection = self._database_lifecycle_manager.get_connection()
         self._repository = ImageFileRepository(connection)
         self._repository.create_table()
         self._cleanup_service = StartupCleanupService(
@@ -135,7 +135,7 @@ class AppLifeCycleApi:
         if self._repository is not None:
             return self._repository
 
-        connection = self._service_manager.get_connection()
+        connection = self._database_lifecycle_manager.get_connection()
         self._repository = ImageFileRepository(connection)
         self._repository.create_table()
         return self._repository

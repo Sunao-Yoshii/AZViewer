@@ -1,4 +1,5 @@
 <script setup>
+import SearchForm from '../form/search_form.vue'
 import FileSelectArea from '../upload/FileSelectArea.vue'
 
 defineProps({
@@ -13,14 +14,6 @@ defineProps({
 })
 
 const emit = defineEmits(['search', 'import-complete'])
-
-const ratingOptions = [
-  { label: 'すべて', value: '' },
-  { label: 'General', value: 'General' },
-  { label: 'R-15', value: 'R-15' },
-  { label: 'R-18', value: 'R-18' },
-  { label: 'R-18G', value: 'R-18G' },
-]
 </script>
 
 <template>
@@ -35,65 +28,7 @@ const ratingOptions = [
         <span class="badge text-bg-light border">image_file_data</span>
       </div>
 
-      <div class="vstack gap-3">
-        <div>
-          <label class="form-label small fw-semibold" for="searchPath">Path</label>
-          <input
-            id="searchPath"
-            v-model="filters.path"
-            class="form-control form-control-sm"
-            type="text"
-            placeholder="部分一致"
-            :disabled="isBusy"
-          />
-        </div>
-
-        <div>
-          <label class="form-label small fw-semibold" for="searchRating">Rating</label>
-          <select
-            id="searchRating"
-            v-model="filters.rating"
-            class="form-select form-select-sm"
-            :disabled="isBusy"
-          >
-            <option v-for="option in ratingOptions" :key="option.value" :value="option.value">
-              {{ option.label }}
-            </option>
-          </select>
-        </div>
-
-        <div class="form-check">
-          <input
-            id="searchChecked"
-            v-model="filters.is_checked"
-            class="form-check-input"
-            type="checkbox"
-            :disabled="isBusy"
-          />
-          <label class="form-check-label small" for="searchChecked">チェック済みのみ</label>
-        </div>
-
-        <div class="form-check">
-          <input
-            id="searchFavorite"
-            v-model="filters.is_favorite"
-            class="form-check-input"
-            type="checkbox"
-            :disabled="isBusy"
-          />
-          <label class="form-check-label small" for="searchFavorite">お気に入りのみ</label>
-        </div>
-
-        <button
-          type="button"
-          class="btn btn-primary btn-sm w-100"
-          :disabled="isBusy"
-          @click="emit('search')"
-        >
-          <i class="bi bi-search me-1" aria-hidden="true"></i>
-          検索
-        </button>
-      </div>
+      <SearchForm :filters="filters" :is-busy="isBusy" @search="emit('search')" />
     </section>
   </aside>
 </template>

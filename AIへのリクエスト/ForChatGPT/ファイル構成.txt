@@ -1,66 +1,68 @@
-AZViewer/
-|-- .env.example
-|-- .gitignore
-|-- LICENSE
-|-- README.md
-|-- build_windows.ps1
-|-- backend/
-|   |-- __init__.py
-|   |-- main.py
-|   |-- requirements.txt
-|   |-- api/
-|   |   |-- __init__.py
-|   |   |-- api_response.py
-|   |   |-- app_api.py
-|   |   |-- app_lifecycle_api.py
-|   |   |-- default_template_api.py
-|   |   |-- image_catalog_api.py
-|   |   |-- image_register_api.py
-|   |   `-- service_manager.py
-|   |-- db/
-|   |   |-- __init__.py
-|   |   `-- connection_manager.py
-|   |-- models/
-|   |   |-- __init__.py
-|   |   `-- image_file.py
-|   |-- repositories/
-|   |   |-- __init__.py
-|   |   `-- image_file_repository.py
-|   `-- services/
-|       |-- __init__.py
-|       |-- dialog_service.py
-|       |-- file_scan_service.py
-|       |-- image_file_import_service.py
-|       |-- startup_cleanup_service.py
-|       `-- thumbnail_cache_service.py
-`-- frontend/
-    |-- index.html
-    |-- package-lock.json
-    |-- package.json
-    |-- vite.config.js
-    |-- public/
-    |   `-- placeholder.png
-    `-- src/
-        |-- App.vue
-        |-- main.js
-        |-- assets/
-        |   `-- images/
-        |       `-- placeholder.svg
-        |-- components/
-        |   |-- pagination.vue
-        |   |-- tile.vue
-        |   |-- common/
-        |   |   `-- LoadingOverlay.vue
-        |   |-- layout/
-        |   |   |-- AppFooter.vue
-        |   |   |-- AppHeader.vue
-        |   |   |-- AppSidebar.vue
-        |   |   |-- Content.vue
-        |   |   `-- MainLayout.vue
-        |   `-- upload/
-        |       |-- ErrorModal.vue
-        |       `-- FileSelectArea.vue
-        |-- services/
-        |   `-- backendApi.js
-        `-- styles/
-            `-- app.css
+.
+├── .gitignore
+├── backend/
+│   ├── __init__.py
+│   ├── api/
+│   │   ├── __init__.py
+│   │   ├── api_response.py
+│   │   ├── app_api.py
+│   │   ├── app_lifecycle_api.py
+│   │   ├── database_lifecycle_manager.py
+│   │   ├── default_template_api.py
+│   │   ├── image_catalog_api.py
+│   │   └── image_register_api.py
+│   ├── db/
+│   │   ├── __init__.py
+│   │   └── connection_manager.py
+│   ├── main.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   └── image_file.py
+│   ├── repositories/
+│   │   ├── __init__.py
+│   │   └── image_file_repository.py
+│   ├── requirements.txt
+│   └── services/
+│       ├── __init__.py
+│       ├── dialog_service.py
+│       ├── file_scan_service.py
+│       ├── image_file_import_service.py
+│       ├── startup_cleanup_service.py
+│       └── thumbnail_cache_service.py
+├── build_windows.ps1
+├── frontend/
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── public/
+│   │   └── placeholder.png
+│   ├── src/
+│   │   ├── App.vue
+│   │   ├── assets/
+│   │   │   └── images/
+│   │   │       └── placeholder.svg
+│   │   ├── components/
+│   │   │   ├── common/
+│   │   │   │   ├── LoadingOverlay.vue
+│   │   │   │   └── pagination.vue
+│   │   │   ├── form/
+│   │   │   │   └── search_form.vue
+│   │   │   ├── layout/
+│   │   │   │   ├── AppFooter.vue
+│   │   │   │   ├── AppHeader.vue
+│   │   │   │   ├── AppSidebar.vue
+│   │   │   │   ├── Content.vue
+│   │   │   │   └── MainLayout.vue
+│   │   │   ├── tile/
+│   │   │   │   └── tile.vue
+│   │   │   └── upload/
+│   │   │       ├── ErrorModal.vue
+│   │   │       └── FileSelectArea.vue
+│   │   ├── main.js
+│   │   ├── services/
+│   │   │   └── backendApi.js
+│   │   └── styles/
+│   │       └── app.css
+│   └── vite.config.js
+├── LICENSE
+└── README.md

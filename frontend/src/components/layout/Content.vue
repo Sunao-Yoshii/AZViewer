@@ -63,12 +63,6 @@ const pageSizeOptions = [25, 50, 75, 100]
       </div>
     </div>
 
-    <div v-if="(searchResult.total_pages ?? 0) > 1" class="d-flex justify-content-between align-items-center">
-      <div class="small text-secondary">
-        {{ searchResult.page }} / {{ searchResult.total_pages }} ページ
-      </div>
-    </div>
-
     <div v-if="(searchResult.total_count ?? 0) === 0" class="card">
       <div class="card-body py-5 text-center text-secondary">一致するデータがありません</div>
     </div>
@@ -81,6 +75,12 @@ const pageSizeOptions = [25, 50, 75, 100]
         :is-searching="isSearching"
         @update-flag="$emit('update-flag', $event)"
       />
+    </div>
+
+    <div v-if="(searchResult.total_pages ?? 0) > 1" class="d-flex justify-content-between align-items-center">
+      <div class="small text-secondary">
+        {{ searchResult.page }} / {{ searchResult.total_pages }} ページ
+      </div>
     </div>
 
     <Pagination

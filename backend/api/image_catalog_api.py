@@ -7,19 +7,20 @@ from backend.repositories import ImageFileRepository
 from backend.services import ThumbnailCacheService
 
 from .api_response import ApiResponse
-from .service_manager import ServiceManager
+from .database_lifecycle_manager import DatabaseLifecycleManager
+
 
 class ImageCatalogApi:
     """画像一覧表示・検索・更新系APIを提供する。"""
 
     def __init__(
         self,
-        service_manager: ServiceManager,
+        database_lifecycle_manager: DatabaseLifecycleManager,
         thumbnail_cache_service: ThumbnailCacheService,
     ) -> None:
-        """利用するサービス管理と一覧用リポジトリを保持する。"""
+        """利用するDB接続管理と一覧用リポジトリを保持する。"""
 
-        self._service_manager = service_manager
+        self._database_lifecycle_manager = database_lifecycle_manager
         self._thumbnail_cache_service = thumbnail_cache_service
         self._repository: ImageFileRepository | None = None
 
@@ -93,7 +94,7 @@ class ImageCatalogApi:
         if self._repository is not None:
             return self._repository
 
-        connection = self._service_manager.get_connection()
+        connection = self._database_lifecycle_manager.get_connection()
         self._repository = ImageFileRepository(connection)
         self._repository.create_table()
         return self._repository

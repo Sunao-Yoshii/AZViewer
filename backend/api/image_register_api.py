@@ -11,7 +11,7 @@ from backend.services import (
 )
 
 from .api_response import ApiResponse
-from .service_manager import ServiceManager
+from .database_lifecycle_manager import DatabaseLifecycleManager
 
 
 class ImageRegisterApi:
@@ -19,13 +19,13 @@ class ImageRegisterApi:
 
     def __init__(
         self,
-        service_manager: ServiceManager,
+        database_lifecycle_manager: DatabaseLifecycleManager,
         window_provider,
         thumbnail_cache_service: ThumbnailCacheService,
     ) -> None:
-        """利用するサービス管理と画像登録系サービスを保持する。"""
+        """利用するDB接続管理と画像登録系サービスを保持する。"""
 
-        self._service_manager = service_manager
+        self._database_lifecycle_manager = database_lifecycle_manager
         self._dialog_service = DialogService(window_provider)
         self._thumbnail_cache_service = thumbnail_cache_service
         self._repository: ImageFileRepository | None = None
@@ -37,7 +37,7 @@ class ImageRegisterApi:
         if self._import_service is not None:
             return self._import_service
 
-        connection = self._service_manager.get_connection()
+        connection = self._database_lifecycle_manager.get_connection()
         self._repository = ImageFileRepository(connection)
         self._repository.create_table()
         self._import_service = ImageFileImportService(
