@@ -1,4 +1,5 @@
 .
+├── .env.example
 ├── .gitignore
 ├── backend/
 │   ├── __init__.py
@@ -30,39 +31,38 @@
 │       ├── startup_cleanup_service.py
 │       └── thumbnail_cache_service.py
 ├── build_windows.ps1
-├── frontend/
-│   ├── index.html
-│   ├── package-lock.json
-│   ├── package.json
-│   ├── public/
-│   │   └── placeholder.png
-│   ├── src/
-│   │   ├── App.vue
-│   │   ├── assets/
-│   │   │   └── images/
-│   │   │       └── placeholder.svg
-│   │   ├── components/
-│   │   │   ├── common/
-│   │   │   │   ├── LoadingOverlay.vue
-│   │   │   │   └── pagination.vue
-│   │   │   ├── form/
-│   │   │   │   └── search_form.vue
-│   │   │   ├── layout/
-│   │   │   │   ├── AppFooter.vue
-│   │   │   │   ├── AppHeader.vue
-│   │   │   │   ├── AppSidebar.vue
-│   │   │   │   ├── Content.vue
-│   │   │   │   └── MainLayout.vue
-│   │   │   ├── tile/
-│   │   │   │   └── tile.vue
-│   │   │   └── upload/
-│   │   │       ├── ErrorModal.vue
-│   │   │       └── FileSelectArea.vue
-│   │   ├── main.js
-│   │   ├── services/
-│   │   │   └── backendApi.js
-│   │   └── styles/
-│   │       └── app.css
-│   └── vite.config.js
-├── LICENSE
-└── README.md
+└── frontend/
+    ├── index.html
+    ├── package-lock.json
+    ├── package.json
+    ├── public/
+    │   └── placeholder.png
+    ├── src/
+    │   ├── App.vue
+    │   ├── assets/
+    │   │   └── images/
+    │   │       └── placeholder.svg
+    │   ├── components/
+    │   │   ├── common/
+    │   │   │   ├── LoadingOverlay.vue
+    │   │   │   └── pagination.vue
+    │   │   ├── form/
+    │   │   │   └── search_form.vue
+    │   │   ├── layout/
+    │   │   │   ├── AppFooter.vue
+    │   │   │   ├── AppHeader.vue
+    │   │   │   ├── AppSidebar.vue
+    │   │   │   ├── Content.vue
+    │   │   │   └── MainLayout.vue
+    │   │   ├── tile/
+    │   │   │   ├── ImageDetailModal.vue
+    │   │   │   └── tile.vue
+    │   │   └── upload/
+    │   │       ├── ErrorModal.vue
+    │   │       └── FileSelectArea.vue
+    │   ├── main.js
+    │   ├── services/
+    │   │   └── backendApi.js
+    │   └── styles/
+    │       └── app.css
+    └── vite.config.js
