@@ -71,6 +71,27 @@ def create_drop_items(event: dict[str, Any]) -> list[dict[str, str]]:
     return items
 
 
+def dispatch_frontend_event(window: object, event_name: str, detail: dict[str, Any]) -> None:
+    """Vue側へCustomEventを発生させる。"""
+
+    window.evaluate_js(
+        "window.dispatchEvent(new CustomEvent("
+        f"{json.dumps(event_name)}, "
+        f"{{ detail: {json.dumps(detail)} }}"
+        "));"
+    )
+
+
+def create_import_event_detail(result: dict[str, Any]) -> dict[str, Any]:
+    """インポートAPI結果をフロントエンドイベント用detailへ変換する。"""
+
+    return {
+        "success": bool(result.get("success")),
+        "message": str(result.get("message") or ""),
+        "data": result.get("data") or {},
+    }
+
+
 def register_handlers(window: object, api: AppApi) -> None:
     """pywebviewのDOMイベントにドラッグ＆ドロップ処理を登録する。"""
 
@@ -81,28 +102,41 @@ def register_handlers(window: object, api: AppApi) -> None:
         items = create_drop_items(event)
         if not items:
             print("Event: drop. Dropped files were not available.")
+            dispatch_frontend_event(
+                window,
+                "azviewer:import-complete",
+                {
+                    "success": False,
+                    "message": "Dropped files were not available.",
+                    "data": {},
+                },
+            )
             return
 
         for item in items:
             print(item["path"])
 
+        dispatch_frontend_event(
+            window,
+            "azviewer:import-start",
+            {
+                "fileCount": len(items),
+            },
+        )
         result = api.import_selected_items({"items": items})
+        detail = create_import_event_detail(result)
         if result.get("success"):
-            data = result.get("data") or {}
+            data = detail["data"]
             print(
                 "Drop import completed. "
                 f"Imported: {data.get('importedCount', 0)}, "
                 f"Skipped: {data.get('skippedCount', 0)}"
             )
-            window.evaluate_js(
-                "window.dispatchEvent(new CustomEvent("
-                "'azviewer:import-complete', "
-                f"{{ detail: {json.dumps(data)} }}"
-                "));"
-            )
+            dispatch_frontend_event(window, "azviewer:import-complete", detail)
             return
 
         print(f"Drop import failed: {result.get('message', '')}", file=sys.stderr)
+        dispatch_frontend_event(window, "azviewer:import-complete", detail)
 
     window.dom.document.events.drop += DOMEventHandler(on_drop, True, True)
 

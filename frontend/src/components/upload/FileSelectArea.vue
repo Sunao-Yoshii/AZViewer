@@ -1,99 +1,16 @@
 <script setup>
-import { ref } from 'vue'
-import {
-  importSelectedItems,
-  selectFilesDialog,
-  selectFolderDialog,
-} from '../../services/backendApi'
+import { useImageImport } from '../../composables/useImageImport'
 import ErrorModal from './ErrorModal.vue'
 
 const emit = defineEmits(['import-complete'])
-const isBusy = ref(false)
-const statusMessage = ref('')
-const errorModal = ref({
-  show: false,
-  summary: '',
-  detail: '',
-  failedFiles: [],
-})
-
-function closeErrorModal() {
-  errorModal.value = {
-    show: false,
-    summary: '',
-    detail: '',
-    failedFiles: [],
-  }
-}
-
-async function importItems(items) {
-  if (items.length === 0) {
-    statusMessage.value = '登録対象がありません'
-    return
-  }
-
-  isBusy.value = true
-  statusMessage.value = '登録中'
-
-  const result = await importSelectedItems(items)
-
-  if (result.success) {
-    const importedCount = result.data?.importedCount ?? 0
-    const skippedCount = result.data?.skippedCount ?? 0
-    statusMessage.value = `登録 ${importedCount} 件 / 除外 ${skippedCount} 件`
-    emit('import-complete', { importedCount, skippedCount })
-  } else {
-    errorModal.value = {
-      show: true,
-      summary: result.data?.errorSummary ?? 'データ登録中にエラーが発生しました。',
-      detail: result.message ?? '',
-      failedFiles: result.data?.failedFiles ?? items.map((item) => item.path),
-    }
-    statusMessage.value = '登録失敗'
-  }
-
-  isBusy.value = false
-}
-
-async function handleSelectFiles() {
-  isBusy.value = true
-  statusMessage.value = 'ファイル選択中'
-  const result = await selectFilesDialog()
-  isBusy.value = false
-
-  if (!result.success) {
-    errorModal.value = {
-      show: true,
-      summary: 'ファイル選択中にエラーが発生しました。',
-      detail: result.message ?? '',
-      failedFiles: [],
-    }
-    statusMessage.value = '選択失敗'
-    return
-  }
-
-  await importItems(result.data?.items ?? [])
-}
-
-async function handleSelectFolder() {
-  isBusy.value = true
-  statusMessage.value = 'フォルダ選択中'
-  const result = await selectFolderDialog()
-  isBusy.value = false
-
-  if (!result.success) {
-    errorModal.value = {
-      show: true,
-      summary: 'フォルダ選択中にエラーが発生しました。',
-      detail: result.message ?? '',
-      failedFiles: [],
-    }
-    statusMessage.value = '選択失敗'
-    return
-  }
-
-  await importItems(result.data?.items ?? [])
-}
+const {
+  isBusy,
+  statusMessage,
+  errorModal,
+  closeErrorModal,
+  handleSelectFiles,
+  handleSelectFolder,
+} = useImageImport({ emit })
 
 function handleDragEvent(event) {
   const files = Array.from(event.dataTransfer?.files ?? []).map((file) => ({
@@ -148,7 +65,9 @@ function handleDragEvent(event) {
         </button>
       </div>
 
-      <p class="file-select-status mb-0" aria-live="polite">{{ statusMessage }}</p>
+      <p class="file-select-status mb-0" aria-live="polite">
+        {{ statusMessage }}
+      </p>
     </div>
   </section>
 
