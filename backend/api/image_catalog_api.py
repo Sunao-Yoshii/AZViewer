@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.repositories import ImageFileRepository
-from backend.services import ThumbnailCacheService
+from backend.services import TagNormalizeService, ThumbnailCacheService
 
 from .api_response import ApiResponse
 from .database_lifecycle_manager import DatabaseLifecycleManager
@@ -24,6 +24,7 @@ class ImageCatalogApi:
 
         self._database_lifecycle_manager = database_lifecycle_manager
         self._thumbnail_cache_service = thumbnail_cache_service
+        self._tag_normalize_service = TagNormalizeService()
         self._repository: ImageFileRepository | None = None
 
     def search_image_files(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -51,7 +52,8 @@ class ImageCatalogApi:
         data = payload if isinstance(payload, dict) else {}
         try:
             detail = self._normalize_detail_payload(data)
-            updated = self._get_repository().update_detail(**detail)
+            tags = self._tag_normalize_service.normalize_tags(data.get("tags"))
+            updated = self._update_detail_with_tags(detail, tags)
         except (TypeError, ValueError) as exc:
             return ApiResponse(success=False, message=str(exc), data=None).to_dict()
         except Exception as exc:
@@ -63,7 +65,7 @@ class ImageCatalogApi:
         return ApiResponse(
             success=True,
             message="Image file detail updated.",
-            data=detail,
+            data={**detail, "tags": tags},
         ).to_dict()
 
     def delete_image_file(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -158,6 +160,24 @@ class ImageCatalogApi:
             "is_favorite": int(data.get("is_favorite")),
             "comment": self._normalize_detail_comment(data.get("comment")),
         }
+
+    def _update_detail_with_tags(self, detail: dict[str, Any], tags: list[str]) -> bool:
+        """詳細項目とタグリンクを同一トランザクションで更新する。"""
+
+        connection = self._database_lifecycle_manager.get_connection()
+        repository = self._get_repository()
+        try:
+            connection.execute("BEGIN")
+            updated = repository.update_detail(**detail, commit=False)
+            if not updated:
+                connection.rollback()
+                return False
+            repository.replace_tags(int(detail["record_id"]), tags)
+            connection.commit()
+            return True
+        except Exception:
+            connection.rollback()
+            raise
 
     def _normalize_detail_comment(self, value: object) -> str | None:
         """詳細更新コメントをDB保存値へ正規化する。"""

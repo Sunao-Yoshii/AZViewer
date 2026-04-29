@@ -36,6 +36,19 @@ const ratingBadgeClass = (rating) => {
 
   <div class="image-tile-comment small mt-2">{{ item.comment || '-' }}</div>
 
+  <div
+    v-if="item.tags?.length"
+    class="mt-2 d-flex flex-wrap gap-1"
+  >
+    <span
+      v-for="tag in item.tags"
+      :key="tag"
+      class="badge text-bg-secondary"
+    >
+      {{ tag }}
+    </span>
+  </div>
+
   <button
     type="button"
     class="btn btn-outline-secondary btn-sm mt-2"

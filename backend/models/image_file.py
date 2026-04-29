@@ -28,6 +28,7 @@ class ImageFileListItem:
     is_checked: int
     is_favorite: int
     comment: str | None = None
+    tags: list[str] | None = None
 
     def to_dict(self) -> dict[str, object]:
         """API返却用の辞書形式へ変換する。"""
@@ -41,6 +42,7 @@ class ImageFileListItem:
             "is_checked": self.is_checked,
             "is_favorite": self.is_favorite,
             "comment": self.comment,
+            "tags": self.tags or [],
         }
 
 

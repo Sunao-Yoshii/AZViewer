@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from math import ceil
 from sqlite3 import Connection
 
@@ -31,6 +32,30 @@ class ImageFileRepository:
             )
             """
         )
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tag (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                CHECK (length(name) <= 128)
+            )
+            """
+        )
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tag_image_link (
+                image_file_id INTEGER NOT NULL,
+                tag_id INTEGER NOT NULL,
+                PRIMARY KEY (image_file_id, tag_id),
+                FOREIGN KEY (image_file_id)
+                    REFERENCES image_file_data(id)
+                    ON DELETE CASCADE,
+                FOREIGN KEY (tag_id)
+                    REFERENCES tag(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
         self._connection.commit()
 
     def find_all_paths(self) -> list[str]:
@@ -57,7 +82,7 @@ class ImageFileRepository:
             ORDER BY id DESC
             """
         ).fetchall()
-        return [self._row_to_item(row) for row in rows]
+        return self._attach_tags([self._row_to_item(row) for row in rows])
 
     def delete_by_paths(self, paths: list[str]) -> list[int]:
         """指定されたパスに一致する画像ファイル情報を削除し、削除IDを返す。"""
@@ -138,7 +163,7 @@ class ImageFileRepository:
             """,
             paths,
         ).fetchall()
-        return [self._row_to_item(row) for row in rows]
+        return self._attach_tags([self._row_to_item(row) for row in rows])
 
     def find_ids_by_paths(self, paths: list[str]) -> list[int]:
         """指定パス群に一致するレコードID一覧を取得する。"""
@@ -216,6 +241,7 @@ class ImageFileRepository:
         ).fetchall()
 
         items = [self._row_to_item(row) for row in rows]
+        items = self._attach_tags(items)
         return SearchImageFilesResult(
             items=items,
             total_count=total_count,
@@ -241,6 +267,8 @@ class ImageFileRepository:
         is_checked: int,
         is_favorite: int,
         comment: str | None,
+        *,
+        commit: bool = True,
     ) -> bool:
         """指定レコードの詳細項目を一括更新する。"""
 
@@ -257,8 +285,51 @@ class ImageFileRepository:
             """,
             (rating, is_checked, is_favorite, comment, record_id),
         )
-        self._connection.commit()
+        if commit:
+            self._connection.commit()
         return cursor.rowcount > 0
+
+    def find_tags_by_image_ids(self, image_ids: list[int]) -> dict[int, list[str]]:
+        """画像ID群に紐づくタグ一覧をまとめて取得する。"""
+
+        if not image_ids:
+            return {}
+
+        placeholders = ", ".join("?" for _ in image_ids)
+        rows = self._connection.execute(
+            f"""
+            SELECT
+                tag_image_link.image_file_id,
+                tag.name
+            FROM tag_image_link
+            INNER JOIN tag ON tag.id = tag_image_link.tag_id
+            WHERE tag_image_link.image_file_id IN ({placeholders})
+            ORDER BY tag_image_link.image_file_id ASC, tag.name ASC
+            """,
+            image_ids,
+        ).fetchall()
+
+        tags_by_image_id = {image_id: [] for image_id in image_ids}
+        for row in rows:
+            tags_by_image_id[int(row["image_file_id"])].append(str(row["name"]))
+        return tags_by_image_id
+
+    def replace_tags(self, image_file_id: int, tags: list[str]) -> None:
+        """指定画像に紐づくタグリンクを置換する。"""
+
+        self._connection.execute(
+            "DELETE FROM tag_image_link WHERE image_file_id = ?",
+            (image_file_id,),
+        )
+        for tag_name in tags:
+            tag_id = self._find_or_create_tag_id(tag_name)
+            self._connection.execute(
+                """
+                INSERT OR IGNORE INTO tag_image_link (image_file_id, tag_id)
+                VALUES (?, ?)
+                """,
+                (image_file_id, tag_id),
+            )
 
     def find_by_id(self, record_id: int) -> ImageFileListItem | None:
         """IDに一致する画像ファイル情報を取得する。"""
@@ -282,7 +353,8 @@ class ImageFileRepository:
         ).fetchone()
         if row is None:
             return None
-        return self._row_to_item(row)
+        item = self._row_to_item(row)
+        return self._attach_tags([item])[0]
 
     def _row_to_item(self, row) -> ImageFileListItem:
         """SQLite行データを一覧表示用DTOへ変換する。"""
@@ -296,7 +368,32 @@ class ImageFileRepository:
             is_checked=int(row["is_checked"]),
             is_favorite=int(row["is_favorite"]),
             comment=None if row["comment"] is None else str(row["comment"]),
+            tags=[],
         )
+
+    def _attach_tags(self, items: list[ImageFileListItem]) -> list[ImageFileListItem]:
+        """一覧項目群へタグ情報をまとめて付与する。"""
+
+        tags_by_image_id = self.find_tags_by_image_ids([item.id for item in items])
+        return [
+            replace(item, tags=tags_by_image_id.get(item.id, []))
+            for item in items
+        ]
+
+    def _find_or_create_tag_id(self, tag_name: str) -> int:
+        """タグ名に対応するIDを取得し、未登録の場合は作成する。"""
+
+        self._connection.execute(
+            "INSERT OR IGNORE INTO tag (name) VALUES (?)",
+            (tag_name,),
+        )
+        row = self._connection.execute(
+            "SELECT id FROM tag WHERE name = ? LIMIT 1",
+            (tag_name,),
+        ).fetchone()
+        if row is None:
+            raise RuntimeError(f"Tag could not be created: {tag_name}")
+        return int(row["id"])
 
     def _build_order_by(self, sort: str) -> str:
         """許可済みソート値からORDER BY句を生成する。"""

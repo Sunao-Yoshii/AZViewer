@@ -12,13 +12,16 @@ const emit = defineEmits(['cancel', 'save'])
 
 const ratingOptions = ['General', 'R-15', 'R-18', 'R-18G']
 const form = ref(createFormState(props.item))
+const tagError = ref('')
 
 const isDirty = computed(() => {
   return (
     form.value.rating !== props.item.rating ||
     Number(form.value.is_checked) !== props.item.is_checked ||
     Number(form.value.is_favorite) !== props.item.is_favorite ||
-    form.value.comment !== (props.item.comment ?? '')
+    form.value.comment !== (props.item.comment ?? '') ||
+    JSON.stringify(normalizeTagsForCompare(form.value.tags)) !==
+      JSON.stringify(normalizeTagsForCompare(props.item.tags))
   )
 })
 
@@ -35,6 +38,8 @@ function createFormState(item) {
     is_checked: item.is_checked === 1,
     is_favorite: item.is_favorite === 1,
     comment: item.comment ?? '',
+    tags: [...(item.tags ?? [])],
+    tagInput: '',
   }
 }
 
@@ -45,7 +50,42 @@ function createSavePayload() {
     is_checked: form.value.is_checked ? 1 : 0,
     is_favorite: form.value.is_favorite ? 1 : 0,
     comment: form.value.comment,
+    tags: form.value.tags,
   }
+}
+
+function normalizeTagText(value) {
+  return value
+    .trim()
+    .replace(/[\[\]\{\}\(\)]/g, '')
+    .replace(/:\d+(?:\.\d+)?$/, '')
+    .trim()
+    .toLowerCase()
+}
+
+function normalizeTagsForCompare(tags) {
+  return [...(tags ?? [])].sort()
+}
+
+function addTagsFromInput() {
+  tagError.value = ''
+  const normalizedTags = form.value.tagInput
+    .split(',')
+    .map(normalizeTagText)
+    .filter(Boolean)
+
+  const tooLong = normalizedTags.find((tag) => tag.length > 128)
+  if (tooLong) {
+    tagError.value = 'タグは128文字以内で入力してください。'
+    return
+  }
+
+  form.value.tags = [...new Set([...form.value.tags, ...normalizedTags])]
+  form.value.tagInput = ''
+}
+
+function removeTag(tag) {
+  form.value.tags = form.value.tags.filter((value) => value !== tag)
 }
 
 function handleReturn() {
@@ -111,6 +151,37 @@ function handleReturn() {
         maxlength="255"
         rows="3"
       ></textarea>
+    </div>
+
+    <div class="mt-2">
+      <label class="form-label small fw-semibold mb-1" :for="`tileTags-${item.id}`">
+        Tags
+      </label>
+      <input
+        :id="`tileTags-${item.id}`"
+        v-model="form.tagInput"
+        class="form-control form-control-sm"
+        type="text"
+        placeholder="タグを入力。カンマ区切り可"
+        @keydown.enter.prevent="addTagsFromInput"
+      />
+      <div v-if="tagError" class="form-text text-danger">{{ tagError }}</div>
+      <div v-if="form.tags.length" class="mt-2 d-flex flex-wrap gap-1">
+        <span
+          v-for="tag in form.tags"
+          :key="tag"
+          class="badge text-bg-secondary"
+        >
+          {{ tag }}
+          <button
+            type="button"
+            class="btn-close btn-close-white ms-1"
+            style="font-size: 0.55rem;"
+            aria-label="タグを削除"
+            @click="removeTag(tag)"
+          ></button>
+        </span>
+      </div>
     </div>
 
     <button type="submit" class="btn btn-primary btn-sm w-100 mt-2">
