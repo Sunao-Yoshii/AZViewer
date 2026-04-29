@@ -7,11 +7,25 @@ defineProps({
 })
 
 defineEmits(['edit'])
+
+const ratingBadgeClass = (rating) => {
+  switch (rating) {
+    case 'General':
+      return 'text-bg-success'
+    case 'R-15':
+      return 'text-bg-warning'
+    case 'R-18':
+    case 'R-18G':
+      return 'text-bg-danger'
+    default:
+      return 'text-bg-secondary'
+  }
+}
 </script>
 
 <template>
   <div class="d-flex flex-wrap gap-1 mt-2">
-    <span class="badge text-bg-secondary">{{ item.rating }}</span>
+    <span :class="['badge', ratingBadgeClass(item.rating)]">{{ item.rating }}</span>
     <span :class="item.is_checked === 1 ? 'badge bg-primary' : 'badge bg-secondary'">
       チェック
     </span>

@@ -9,6 +9,7 @@ from .database_lifecycle_manager import DatabaseLifecycleManager
 from .default_template_api import DefaultTemplateApi
 from .image_catalog_api import ImageCatalogApi
 from .image_register_api import ImageRegisterApi
+from .os_operation_api import OsOperationApi
 
 
 class AppApi:
@@ -19,6 +20,7 @@ class AppApi:
 
         database_lifecycle_manager = DatabaseLifecycleManager()
         default_template_api = DefaultTemplateApi()
+        os_operation_api = OsOperationApi()
         thumbnail_cache_service = ThumbnailCacheService()
         image_catalog_api = ImageCatalogApi(database_lifecycle_manager, thumbnail_cache_service)
 
@@ -30,6 +32,7 @@ class AppApi:
         )
         self._default_template_api = default_template_api
         self._image_catalog_api = image_catalog_api
+        self._os_operation_api = os_operation_api
         self._image_register_api = ImageRegisterApi(
             database_lifecycle_manager,
             self._get_active_window,
@@ -105,6 +108,11 @@ class AppApi:
         """ローカル画像の表示用データURL1を返す。"""
 
         return self._image_catalog_api.fetchLocalImageThumb(payload)
+
+    def open_containing_folder(self, payload: dict[str, object]) -> dict[str, object]:
+        """指定ファイルが存在するフォルダをエクスプローラで開く。"""
+
+        return self._os_operation_api.open_containing_folder(payload)
 
     def _get_active_window(self) -> object | None:
         """現在利用可能なpywebviewウィンドウを返す。"""

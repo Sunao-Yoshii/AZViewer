@@ -17,7 +17,8 @@ const isDirty = computed(() => {
   return (
     form.value.rating !== props.item.rating ||
     Number(form.value.is_checked) !== props.item.is_checked ||
-    Number(form.value.is_favorite) !== props.item.is_favorite
+    Number(form.value.is_favorite) !== props.item.is_favorite ||
+    form.value.comment !== (props.item.comment ?? '')
   )
 })
 
@@ -33,6 +34,7 @@ function createFormState(item) {
     rating: item.rating ?? 'General',
     is_checked: item.is_checked === 1,
     is_favorite: item.is_favorite === 1,
+    comment: item.comment ?? '',
   }
 }
 
@@ -42,7 +44,7 @@ function createSavePayload() {
     rating: form.value.rating,
     is_checked: form.value.is_checked ? 1 : 0,
     is_favorite: form.value.is_favorite ? 1 : 0,
-    comment: props.item.comment ?? '',
+    comment: form.value.comment,
   }
 }
 
@@ -60,22 +62,21 @@ function handleReturn() {
   <form class="image-tile-edit mt-2" @submit.prevent="handleReturn">
     <fieldset class="mb-2">
       <legend class="form-label small fw-semibold mb-1">Rating</legend>
-      <div
-        v-for="rating in ratingOptions"
-        :key="rating"
-        class="form-check image-tile-rating"
-      >
-        <input
-          :id="`tileRating-${item.id}-${rating}`"
-          v-model="form.rating"
-          class="form-check-input"
-          type="radio"
-          :name="`tileRating-${item.id}`"
-          :value="rating"
-        />
-        <label class="form-check-label" :for="`tileRating-${item.id}-${rating}`">
-          {{ rating }}
-        </label>
+      <div class="btn-group btn-group-sm image-tile-rating-group" role="group" aria-label="Rating">
+        <template v-for="rating in ratingOptions" :key="rating">
+          <input
+            :id="`tileRating-${item.id}-${rating}`"
+            v-model="form.rating"
+            class="btn-check"
+            type="radio"
+            :name="`tileRating-${item.id}`"
+            :value="rating"
+            autocomplete="off"
+          />
+          <label class="btn btn-outline-secondary" :for="`tileRating-${item.id}-${rating}`">
+            {{ rating }}
+          </label>
+        </template>
       </div>
     </fieldset>
 
@@ -97,6 +98,19 @@ function handleReturn() {
         type="checkbox"
       />
       <label class="form-check-label" :for="`tileFavorite-${item.id}`">お気に入り</label>
+    </div>
+
+    <div class="mt-2">
+      <label class="form-label small fw-semibold mb-1" :for="`tileComment-${item.id}`">
+        Comment
+      </label>
+      <textarea
+        :id="`tileComment-${item.id}`"
+        v-model="form.comment"
+        class="form-control form-control-sm"
+        maxlength="255"
+        rows="3"
+      ></textarea>
     </div>
 
     <button type="submit" class="btn btn-primary btn-sm w-100 mt-2">

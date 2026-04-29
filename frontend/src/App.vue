@@ -10,6 +10,7 @@ import {
   deleteImageFile,
   fetchLocalImage,
   fetchLocalImageThumb,
+  openContainingFolder,
   searchImageFiles,
   updateImageFileDetail,
 } from './services/backendApi'
@@ -213,6 +214,13 @@ function handleCloseDetail() {
   isDetailImageLoading.value = false
 }
 
+async function handleOpenContainingFolder(path) {
+  const result = await openContainingFolder(path)
+  if (!result.success) {
+    pushToast({ type: 'error', message: result.message || 'フォルダを開けませんでした。' })
+  }
+}
+
 async function handleDelete(id) {
   if (!window.confirm('このアプリケーション上から削除します。よろしいですか？')) {
     return
@@ -234,7 +242,6 @@ async function handleSaveDetail(payload) {
       pushToast({ type: 'error', message: result.message || '詳細の保存に失敗しました。' })
       return
     }
-    handleCloseDetail()
     await executeSearch({}, true)
   } finally {
     isSavingDetail.value = false
@@ -279,9 +286,8 @@ onBeforeUnmount(() => {
     :item="selectedDetailItem"
     :image-url="detailImageUrl"
     :is-loading-image="isDetailImageLoading"
-    :is-saving="isSavingDetail"
     @close="handleCloseDetail"
-    @save="handleSaveDetail"
+    @open-folder="handleOpenContainingFolder"
   />
   <LoadingOverlay
     :show="isOverlayVisible"

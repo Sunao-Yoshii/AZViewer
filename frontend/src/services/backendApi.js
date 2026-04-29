@@ -79,3 +79,7 @@ export async function fetchLocalImage(path) {
 export async function fetchLocalImageThumb(id) {
   return await callBackendApi('fetchLocalImageThumb', { id })
 }
+
+export async function openContainingFolder(path) {
+  return await callBackendApi('open_containing_folder', { path })
+}

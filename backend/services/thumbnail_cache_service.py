@@ -8,7 +8,7 @@ from PIL import Image, ImageOps
 from backend.models import ImageFileListItem
 
 LOGGER = logging.getLogger(__name__)
-THUMBNAIL_SIZE = 200
+THUMBNAIL_SIZE = 300
 
 
 class ThumbnailCacheService:

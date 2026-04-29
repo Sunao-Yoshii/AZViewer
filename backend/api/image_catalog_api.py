@@ -151,14 +151,23 @@ class ImageCatalogApi:
     def _normalize_detail_payload(self, data: dict[str, Any]) -> dict[str, Any]:
         """詳細更新ペイロードをリポジトリ用の値へ正規化する。"""
 
-        comment = data.get("comment")
-        if comment is not None:
-            comment = str(comment)
-
         return {
             "record_id": int(data.get("id")),
             "rating": str(data.get("rating") or ""),
             "is_checked": int(data.get("is_checked")),
             "is_favorite": int(data.get("is_favorite")),
-            "comment": comment,
+            "comment": self._normalize_detail_comment(data.get("comment")),
         }
+
+    def _normalize_detail_comment(self, value: object) -> str | None:
+        """詳細更新コメントをDB保存値へ正規化する。"""
+
+        if value is None:
+            return None
+
+        comment = str(value)
+        if comment == "":
+            return None
+        if len(comment) > 255:
+            raise ValueError("comment must be 255 characters or less.")
+        return comment
