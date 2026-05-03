@@ -1,8 +1,8 @@
 import { ref } from 'vue'
 
-export function useToast() {
-  const toasts = ref([])
+const toasts = ref([])
 
+export function useToast() {
   function removeToast(id) {
     toasts.value = toasts.value.filter((toast) => toast.id !== id)
   }
@@ -17,7 +17,7 @@ export function useToast() {
       ...toasts.value,
       {
         id,
-        type: notification.type === 'error' ? 'danger' : 'info',
+        type: normalizeToastType(notification.type),
         title: notification.title ?? '',
         message: notification.message,
       },
@@ -30,4 +30,14 @@ export function useToast() {
     pushToast,
     removeToast,
   }
+}
+
+function normalizeToastType(type) {
+  if (type === 'error') {
+    return 'danger'
+  }
+  if (['danger', 'warning', 'success', 'info'].includes(type)) {
+    return type
+  }
+  return 'info'
 }

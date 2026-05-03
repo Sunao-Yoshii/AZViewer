@@ -249,6 +249,30 @@ body {
   text-decoration: underline;
 }
 
+.tag_area {
+  max-height: 6rem;
+  overflow: auto;
+}
+
+.metadata-modal-title {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.metadata-modal-dialog {
+  max-height: calc(100vh - 2rem);
+}
+
+.metadata-textarea {
+  height: 6rem;
+  min-height: 6rem;
+  max-height: 20rem;
+  resize: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: pre;
+  overflow: auto;
+}
+
 .image-detail-body {
   min-height: 0;
   overflow: auto;
@@ -342,6 +366,14 @@ body {
 
 .toast-card-danger {
   border-left-color: #dc3545;
+}
+
+.toast-card-success {
+  border-left-color: #198754;
+}
+
+.toast-card-warning {
+  border-left-color: #ffc107;
 }
 
 .toast-card-info {

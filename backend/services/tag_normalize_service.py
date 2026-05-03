@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-FORBIDDEN_TAG_CHARS = re.compile(r"[\[\]\{\}\(\)]")
+BRACKET_CHARS = frozenset("()[]{}")
 TRAILING_WEIGHT = re.compile(r":\d+(?:\.\d+)?$")
 MAX_TAG_LENGTH = 128
 
@@ -45,6 +45,20 @@ class TagNormalizeService:
         """タグ文字列1件を保存用表記へ正規化する。"""
 
         tag = value.strip()
-        tag = FORBIDDEN_TAG_CHARS.sub("", tag)
+        tag = self._remove_unescaped_brackets(tag)
         tag = TRAILING_WEIGHT.sub("", tag)
         return tag.strip().lower()
+
+    def _remove_unescaped_brackets(self, value: str) -> str:
+        """バックスラッシュでエスケープされていない括弧だけ除去する。"""
+
+        chars: list[str] = []
+        previous = ""
+        for char in value:
+            if char in BRACKET_CHARS and previous != "\\":
+                previous = char
+                continue
+
+            chars.append(char)
+            previous = char
+        return "".join(chars)

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.repositories import ImageFileRepository
-from backend.services import TagNormalizeService, ThumbnailCacheService
+from backend.services import ImageMetadataService, TagNormalizeService, ThumbnailCacheService
 
 from .api_response import ApiResponse
 from .database_lifecycle_manager import DatabaseLifecycleManager
@@ -19,11 +19,13 @@ class ImageCatalogApi:
         self,
         database_lifecycle_manager: DatabaseLifecycleManager,
         thumbnail_cache_service: ThumbnailCacheService,
+        metadata_service: ImageMetadataService | None = None,
     ) -> None:
         """利用するDB接続管理と一覧用リポジトリを保持する。"""
 
         self._database_lifecycle_manager = database_lifecycle_manager
         self._thumbnail_cache_service = thumbnail_cache_service
+        self._metadata_service = metadata_service or ImageMetadataService()
         self._tag_normalize_service = TagNormalizeService()
         self._repository: ImageFileRepository | None = None
 
@@ -129,6 +131,39 @@ class ImageCatalogApi:
                 "contentType": "image/png",
                 "dataUrl": f"data:image/png;base64,{encoded}",
             },
+        ).to_dict()
+
+    def fetch_image_metadata(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """ローカル画像のメタ情報を表示用テキストとして返す。"""
+
+        data = payload if isinstance(payload, dict) else {}
+        path = str(data.get("path") or "")
+        if not path:
+            return ApiResponse(
+                success=False,
+                message="path が指定されていません。",
+                data={"metadata": ""},
+            ).to_dict()
+
+        try:
+            metadata = self._metadata_service.fetch_metadata_text(path)
+        except FileNotFoundError:
+            return ApiResponse(
+                success=False,
+                message="画像ファイルが存在しません。",
+                data={"metadata": ""},
+            ).to_dict()
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="メタ情報を取得できませんでした。",
+                data={"metadata": ""},
+            ).to_dict()
+
+        return ApiResponse(
+            success=True,
+            message="",
+            data={"metadata": metadata},
         ).to_dict()
 
     def _get_repository(self) -> ImageFileRepository:

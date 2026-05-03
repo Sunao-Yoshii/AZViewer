@@ -6,7 +6,7 @@ defineProps({
   },
 })
 
-defineEmits(['edit'])
+defineEmits(['edit', 'open-metadata'])
 
 const ratingBadgeClass = (rating) => {
   switch (rating) {
@@ -38,7 +38,8 @@ const ratingBadgeClass = (rating) => {
 
   <div
     v-if="item.tags?.length"
-    class="mt-2 d-flex flex-wrap gap-1"
+    class="mt-2 d-flex flex-wrap gap-1 tag_area"
+    id="tag_area"
   >
     <span
       v-for="tag in item.tags"
@@ -49,11 +50,20 @@ const ratingBadgeClass = (rating) => {
     </span>
   </div>
 
-  <button
-    type="button"
-    class="btn btn-outline-secondary btn-sm mt-2"
-    @click="$emit('edit')"
-  >
-    Edit
-  </button>
+  <div class="d-flex flex-wrap gap-2 mt-2">
+    <button
+      type="button"
+      class="btn btn-outline-secondary btn-sm"
+      @click="$emit('open-metadata')"
+    >
+      メタ情報
+    </button>
+    <button
+      type="button"
+      class="btn btn-outline-secondary btn-sm"
+      @click="$emit('edit')"
+    >
+      Edit
+    </button>
+  </div>
 </template>

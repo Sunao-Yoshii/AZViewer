@@ -8,9 +8,10 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['cancel', 'save'])
+const emit = defineEmits(['cancel', 'save', 'open-metadata'])
 
 const ratingOptions = ['General', 'R-15', 'R-18', 'R-18G']
+const BRACKET_CHARS = new Set(['(', ')', '[', ']', '{', '}'])
 const form = ref(createFormState(props.item))
 const tagError = ref('')
 
@@ -57,10 +58,16 @@ function createSavePayload() {
 function normalizeTagText(value) {
   return value
     .trim()
-    .replace(/[\[\]\{\}\(\)]/g, '')
+    .split('')
+    .filter((char, index, chars) => !isUnescapedBracket(char, chars[index - 1]))
+    .join('')
     .replace(/:\d+(?:\.\d+)?$/, '')
     .trim()
     .toLowerCase()
+}
+
+function isUnescapedBracket(char, previousChar) {
+  return BRACKET_CHARS.has(char) && previousChar !== '\\'
 }
 
 function normalizeTagsForCompare(tags) {
@@ -88,6 +95,10 @@ function removeTag(tag) {
   form.value.tags = form.value.tags.filter((value) => value !== tag)
 }
 
+function applyTextToTagInput(value) {
+  form.value.tagInput = value
+}
+
 function handleReturn() {
   if (!isDirty.value) {
     emit('cancel')
@@ -96,6 +107,10 @@ function handleReturn() {
 
   emit('save', createSavePayload())
 }
+
+defineExpose({
+  applyTextToTagInput,
+})
 </script>
 
 <template>
@@ -154,9 +169,18 @@ function handleReturn() {
     </div>
 
     <div class="mt-2">
-      <label class="form-label small fw-semibold mb-1" :for="`tileTags-${item.id}`">
-        Tags
-      </label>
+      <div class="d-flex justify-content-between align-items-center gap-2 mb-1">
+        <label class="form-label small fw-semibold mb-0" :for="`tileTags-${item.id}`">
+          Tags
+        </label>
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          @click="$emit('open-metadata')"
+        >
+          メタ情報からタグ
+        </button>
+      </div>
       <input
         :id="`tileTags-${item.id}`"
         v-model="form.tagInput"

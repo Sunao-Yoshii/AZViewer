@@ -109,6 +109,11 @@ class AppApi:
 
         return self._image_catalog_api.fetchLocalImageThumb(payload)
 
+    def fetch_image_metadata(self, payload: dict[str, object]) -> dict[str, object]:
+        """ローカル画像のメタ情報を表示用テキストとして返す。"""
+
+        return self._image_catalog_api.fetch_image_metadata(payload)
+
     def open_containing_folder(self, payload: dict[str, object]) -> dict[str, object]:
         """指定ファイルが存在するフォルダをエクスプローラで開く。"""
 

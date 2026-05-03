@@ -40,8 +40,9 @@ try {
         --clean `
         --name "AZViewer" `
         --windowed `
+        --add-binary `
         --paths "backend" `
-        --collect-submodules "webview" `
+        --collect-submodules "pywebview,Pillow" `
         --add-data "frontend\dist;frontend\dist" `
         "backend\main.py"
 }
