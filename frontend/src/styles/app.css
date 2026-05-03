@@ -273,11 +273,18 @@ body {
   overflow: auto;
 }
 
-.tag-badge-close {
+.search-badge-close {
   font-size: 0.55rem;
 }
 
-.tag-search-list {
+.search-folder-badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.search-candidate-list {
   display: flex;
   flex-wrap: wrap;
   gap: 0.4rem;
@@ -285,14 +292,35 @@ body {
   overflow: auto;
 }
 
-.tag-search-item {
+.search-candidate-item {
   cursor: pointer;
 }
 
-.tag-search-item.is-selected {
+.search-candidate-item.is-selected {
   color: #fff;
   background-color: #6c757d !important;
   border-color: #6c757d !important;
+}
+
+.folder-search-item {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  gap: 0.35rem;
+  white-space: normal;
+  text-align: left;
+}
+
+.folder-search-name {
+  overflow-wrap: anywhere;
+}
+
+.folder-search-count {
+  color: #6c757d;
+}
+
+.folder-search-item.is-selected .folder-search-count {
+  color: #fff;
 }
 
 .image-detail-body {

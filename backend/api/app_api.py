@@ -119,6 +119,11 @@ class AppApi:
 
         return self._image_catalog_api.fetch_tags_for_search(payload)
 
+    def fetch_folders_for_search(self, payload: dict[str, object]) -> dict[str, object]:
+        """フォルダ検索候補を返す。"""
+
+        return self._image_catalog_api.fetch_folders_for_search(payload)
+
     def open_containing_folder(self, payload: dict[str, object]) -> dict[str, object]:
         """指定ファイルが存在するフォルダをエクスプローラで開く。"""
 

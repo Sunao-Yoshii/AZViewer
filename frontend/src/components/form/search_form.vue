@@ -1,6 +1,10 @@
 <script setup>
 import { reactive, ref } from 'vue'
-import { fetchTagsForSearch } from '../../services/backendApi'
+import {
+  fetchFoldersForSearch,
+  fetchTagsForSearch,
+} from '../../services/backendApi'
+import FolderSearchModal from './FolderSearchModal.vue'
 import TagSearchModal from './TagSearchModal.vue'
 
 const props = defineProps({
@@ -16,7 +20,14 @@ const props = defineProps({
 
 const emit = defineEmits(['search'])
 const showTagSearchModal = ref(false)
+const showFolderSearchModal = ref(false)
 const tagSearchState = reactive({
+  items: [],
+  totalCount: 0,
+  isLoading: false,
+  message: '',
+})
+const folderSearchState = reactive({
   items: [],
   totalCount: 0,
   isLoading: false,
@@ -35,6 +46,10 @@ function removeSearchTag(tag) {
   props.filters.tags = (props.filters.tags ?? []).filter((value) => value !== tag)
 }
 
+function clearSearchFolder() {
+  props.filters.folder = null
+}
+
 async function openTagSearchModal() {
   showTagSearchModal.value = true
   await handleSearchTags({ keyword: '' })
@@ -47,6 +62,20 @@ function closeTagSearchModal() {
 function applyTags(tags) {
   props.filters.tags = [...tags].slice(0, 3)
   showTagSearchModal.value = false
+}
+
+async function openFolderSearchModal() {
+  showFolderSearchModal.value = true
+  await handleSearchFolders({ keyword: '' })
+}
+
+function closeFolderSearchModal() {
+  showFolderSearchModal.value = false
+}
+
+function applyFolder(folder) {
+  props.filters.folder = folder || null
+  showFolderSearchModal.value = false
 }
 
 async function handleSearchTags({ keyword }) {
@@ -76,6 +105,35 @@ function applyTagSearchFailure(message = 'タグ一覧を取得できません�
   tagSearchState.items = []
   tagSearchState.totalCount = 0
   tagSearchState.message = message || 'タグ一覧を取得できませんでした。'
+}
+
+async function handleSearchFolders({ keyword }) {
+  folderSearchState.isLoading = true
+  folderSearchState.message = ''
+
+  try {
+    const result = await fetchFoldersForSearch({
+      keyword: keyword ?? '',
+      limit: 256,
+    })
+    if (!result.success) {
+      applyFolderSearchFailure(result.message)
+      return
+    }
+
+    folderSearchState.items = result.data?.folders ?? []
+    folderSearchState.totalCount = result.data?.total_count ?? 0
+  } catch {
+    applyFolderSearchFailure()
+  } finally {
+    folderSearchState.isLoading = false
+  }
+}
+
+function applyFolderSearchFailure(message = 'フォルダ一覧を取得できませんでした。') {
+  folderSearchState.items = []
+  folderSearchState.totalCount = 0
+  folderSearchState.message = message || 'フォルダ一覧を取得できませんでした。'
 }
 </script>
 
@@ -131,6 +189,34 @@ function applyTagSearchFailure(message = 'タグ一覧を取得できません�
 
     <div>
       <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="form-label small fw-semibold mb-0">フォルダ</span>
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          :disabled="isBusy"
+          @click="openFolderSearchModal"
+        >
+          フォルダ選択
+        </button>
+      </div>
+
+      <div v-if="filters.folder" class="d-flex flex-wrap gap-1">
+        <span class="badge text-bg-secondary search-folder-badge">
+          {{ filters.folder }}
+          <button
+            type="button"
+            class="btn-close btn-close-white ms-1 search-badge-close"
+            aria-label="フォルダ検索条件を解除"
+            :disabled="isBusy"
+            @click="clearSearchFolder"
+          ></button>
+        </span>
+      </div>
+      <div v-else class="small text-secondary">未指定</div>
+    </div>
+
+    <div>
+      <div class="d-flex justify-content-between align-items-center mb-1">
         <span class="form-label small fw-semibold mb-0">タグ</span>
         <button
           type="button"
@@ -151,7 +237,7 @@ function applyTagSearchFailure(message = 'タグ一覧を取得できません�
           {{ tag }}
           <button
             type="button"
-            class="btn-close btn-close-white ms-1 tag-badge-close"
+            class="btn-close btn-close-white ms-1 search-badge-close"
             aria-label="タグを検索条件から削除"
             :disabled="isBusy"
             @click="removeSearchTag(tag)"
@@ -181,6 +267,17 @@ function applyTagSearchFailure(message = 'タグ一覧を取得できません�
       @close="closeTagSearchModal"
       @apply="applyTags"
       @search-tags="handleSearchTags"
+    />
+    <FolderSearchModal
+      :show="showFolderSearchModal"
+      :selected-folder="filters.folder"
+      :folder-items="folderSearchState.items"
+      :total-count="folderSearchState.totalCount"
+      :is-loading="folderSearchState.isLoading"
+      :external-message="folderSearchState.message"
+      @close="closeFolderSearchModal"
+      @apply="applyFolder"
+      @search-folders="handleSearchFolders"
     />
   </div>
 </template>

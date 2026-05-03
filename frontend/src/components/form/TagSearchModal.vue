@@ -105,7 +105,7 @@ function handleApply() {
                   {{ tag }}
                   <button
                     type="button"
-                    class="btn-close btn-close-white ms-1 tag-badge-close"
+                    class="btn-close btn-close-white ms-1 search-badge-close"
                     aria-label="タグを削除"
                     @click="removeTag(tag)"
                   ></button>
@@ -144,12 +144,12 @@ function handleApply() {
               <span v-if="isLoading">読み込み中</span>
             </div>
 
-            <div class="tag-search-list">
+            <div class="search-candidate-list">
               <button
                 v-for="tag in tagItems"
                 :key="tag.id"
                 type="button"
-                class="badge text-bg-light border tag-search-item"
+                class="badge text-bg-light border search-candidate-item"
                 :class="{ 'is-selected': workingSelectedTags.includes(tag.name) }"
                 @click="addTag(tag.name)"
               >

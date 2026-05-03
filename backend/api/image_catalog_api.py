@@ -39,6 +39,7 @@ class ImageCatalogApi:
             is_checked=data.get("is_checked"),
             is_favorite=data.get("is_favorite"),
             tags=self._normalize_search_tags(data.get("tags")),
+            folder=self._normalize_search_folder(data.get("folder")),
             page=int(data.get("page", 1) or 1),
             page_size=int(data.get("page_size", 25) or 25),
             sort=str(data.get("sort", "id_desc") or "id_desc"),
@@ -199,6 +200,38 @@ class ImageCatalogApi:
             },
         ).to_dict()
 
+    def fetch_folders_for_search(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """フォルダ検索ダイアログに表示するフォルダ候補を返す。"""
+
+        limit = 256
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            keyword = str(data.get("keyword") or "").strip()
+            limit = self._normalize_tag_search_limit(data.get("limit"))
+            repository = self._get_repository()
+            folders = repository.find_folders_for_search(keyword=keyword, limit=limit)
+            total_count = repository.count_folders_for_search(keyword=keyword)
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="フォルダ一覧を取得できませんでした。",
+                data={
+                    "folders": [],
+                    "total_count": 0,
+                    "limit": limit,
+                },
+            ).to_dict()
+
+        return ApiResponse(
+            success=True,
+            message="",
+            data={
+                "folders": [folder.to_dict() for folder in folders],
+                "total_count": total_count,
+                "limit": limit,
+            },
+        ).to_dict()
+
     def _get_repository(self) -> ImageFileRepository:
         """一覧系処理で利用するリポジトリを返す。"""
 
@@ -231,6 +264,12 @@ class ImageCatalogApi:
                 continue
             tags.append(tag)
         return tags[:3]
+
+    def _normalize_search_folder(self, value: object) -> str | None:
+        """検索条件用フォルダを空文字ならNoneへ正規化する。"""
+
+        folder = str(value or "").strip()
+        return folder or None
 
     def _normalize_tag_search_limit(self, value: object) -> int:
         """タグ候補取得件数を1から256の範囲へ丸める。"""

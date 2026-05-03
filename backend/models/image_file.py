@@ -63,6 +63,22 @@ class TagListItem:
 
 
 @dataclass(frozen=True)
+class FolderListItem:
+    """フォルダ検索候補の1件分データを表す。"""
+
+    name: str
+    image_count: int
+
+    def to_dict(self) -> dict[str, object]:
+        """API返却用の辞書形式へ変換する。"""
+
+        return {
+            "name": self.name,
+            "image_count": self.image_count,
+        }
+
+
+@dataclass(frozen=True)
 class SearchImageFilesResult:
     """画像一覧検索結果を表す。"""
 
