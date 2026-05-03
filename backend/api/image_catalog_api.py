@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Any
 
 from backend.repositories import ImageFileRepository
-from backend.services import ImageMetadataService, TagNormalizeService, ThumbnailCacheService
+from backend.models import PromptTagImportResult
+from backend.services import ImageMetadataService, PromptTagImportService, TagNormalizeService, ThumbnailCacheService
 
 from .api_response import ApiResponse
 from .database_lifecycle_manager import DatabaseLifecycleManager
@@ -230,6 +231,36 @@ class ImageCatalogApi:
                 "total_count": total_count,
                 "limit": limit,
             },
+        ).to_dict()
+
+    def import_prompt_tags(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """タグ未登録画像へプロンプト由来タグを一括登録する。"""
+
+        try:
+            result = PromptTagImportService(
+                self._get_repository(),
+                self._metadata_service,
+                self._tag_normalize_service,
+            ).import_prompt_tags()
+        except Exception:
+            result = PromptTagImportResult(
+                target_count=0,
+                processed_count=0,
+                tagged_count=0,
+                skipped_count=0,
+                failed_count=0,
+                failed_files=[],
+            )
+            return ApiResponse(
+                success=False,
+                message="プロンプト情報の読み取り中にエラーが発生しました。",
+                data=result.to_api_data(),
+            ).to_dict()
+
+        return ApiResponse(
+            success=True,
+            message="プロンプト情報の読み取りが完了しました。",
+            data=result.to_api_data(),
         ).to_dict()
 
     def _get_repository(self) -> ImageFileRepository:

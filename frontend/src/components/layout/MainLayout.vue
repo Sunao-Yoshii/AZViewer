@@ -22,12 +22,16 @@ defineProps({
   },
 })
 
-defineEmits(['search', 'import-complete'])
+defineEmits(['search', 'import-complete', 'import-prompt-tags'])
 </script>
 
 <template>
   <div class="app-shell">
-    <AppHeader :app-info="appInfo" />
+    <AppHeader
+      :app-info="appInfo"
+      :is-busy="isSearching"
+      @import-prompt-tags="$emit('import-prompt-tags')"
+    />
 
     <div class="app-body d-flex">
       <AppSidebar

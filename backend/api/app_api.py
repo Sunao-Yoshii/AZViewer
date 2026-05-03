@@ -124,6 +124,11 @@ class AppApi:
 
         return self._image_catalog_api.fetch_folders_for_search(payload)
 
+    def import_prompt_tags(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """タグ未登録画像へプロンプト由来タグを一括登録する。"""
+
+        return self._image_catalog_api.import_prompt_tags(payload)
+
     def open_containing_folder(self, payload: dict[str, object]) -> dict[str, object]:
         """指定ファイルが存在するフォルダをエクスプローラで開く。"""
 

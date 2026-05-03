@@ -28,7 +28,7 @@ class DefaultTemplateApi:
             message="Application information loaded.",
             data={
                 "name": "AZViewer",
-                "version": "0.2.0",
+                "version": "0.3.0",
                 "description": "pywebview + Vue + Bootstrap application foundation.",
             },
         ).to_dict()

@@ -84,6 +84,31 @@ class ImageFileRepository:
         ).fetchall()
         return self._attach_tags([self._row_to_item(row) for row in rows])
 
+    def find_items_without_tags(self) -> list[ImageFileListItem]:
+        """タグが1件も紐づいていない画像ファイル情報を取得する。"""
+
+        rows = self._connection.execute(
+            """
+            SELECT
+                id,
+                filename,
+                path,
+                folder,
+                rating,
+                is_checked,
+                is_favorite,
+                comment
+            FROM image_file_data image_file
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM tag_image_link tag_link
+                WHERE tag_link.image_file_id = image_file.id
+            )
+            ORDER BY image_file.id ASC
+            """
+        ).fetchall()
+        return [self._row_to_item(row) for row in rows]
+
     def delete_by_paths(self, paths: list[str]) -> list[int]:
         """指定されたパスに一致する画像ファイル情報を削除し、削除IDを返す。"""
 
@@ -403,6 +428,17 @@ class ImageFileRepository:
                 """,
                 (image_file_id, tag_id),
             )
+
+    def replace_tags_atomic(self, image_file_id: int, tags: list[str]) -> None:
+        """指定画像のタグリンク置換を1トランザクションで完結させる。"""
+
+        try:
+            self._connection.execute("BEGIN")
+            self.replace_tags(image_file_id, tags)
+            self._connection.commit()
+        except Exception:
+            self._connection.rollback()
+            raise
 
     def find_by_id(self, record_id: int) -> ImageFileListItem | None:
         """IDに一致する画像ファイル情報を取得する。"""

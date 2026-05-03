@@ -92,6 +92,10 @@ export async function fetchFoldersForSearch(payload = {}) {
   return await callBackendApi('fetch_folders_for_search', payload)
 }
 
+export async function importPromptTags() {
+  return await callBackendApi('import_prompt_tags', {})
+}
+
 export async function openContainingFolder(path) {
   return await callBackendApi('open_containing_folder', { path })
 }

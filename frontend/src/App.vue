@@ -7,6 +7,7 @@ import ImageDetailModal from './components/tile/ImageDetailModal.vue'
 import { useAppStatus } from './composables/useAppStatus'
 import { useImageDetail } from './composables/useImageDetail'
 import { useImageMutations } from './composables/useImageMutations'
+import { usePromptTagImport } from './composables/usePromptTagImport'
 import { useImageSearch } from './composables/useImageSearch'
 import { useLoadingOverlay } from './composables/useLoadingOverlay'
 import { useToast } from './composables/useToast'
@@ -52,6 +53,14 @@ const {
   setStatus,
   refresh: executeSearch,
 })
+const {
+  isImporting: isImportingPromptTags,
+  handleImportPromptTags,
+} = usePromptTagImport({
+  pushToast,
+  loading,
+  refresh: executeSearch,
+})
 
 function handleImportStartedEvent() {
   loading.showLoading('登録中', 'ドロップされた画像ファイルを登録しています。しばらくお待ちください。')
@@ -89,9 +98,10 @@ onBeforeUnmount(() => {
     :app-info="appInfo"
     :filters="filters"
     :status="status"
-    :is-searching="isSearching"
+    :is-searching="isSearching || isImportingPromptTags"
     @search="handleSearch"
     @import-complete="handleImportComplete"
+    @import-prompt-tags="handleImportPromptTags"
   >
     <Content
       :search-result="searchResult"

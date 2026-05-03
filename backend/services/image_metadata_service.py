@@ -29,6 +29,13 @@ EXIF_IFD_SPECS = [
     (ExifTags.IFD.Interop, "interop", ExifTags.TAGS),
     (ExifTags.IFD.IFD1, "thumbnail", ExifTags.TAGS),
 ]
+PROMPT_METADATA_KEYS_BY_EXTENSION = {
+    ".png": "parameters",
+    ".jpg": "exif.UserComment",
+    ".jpeg": "exif.UserComment",
+    ".webp": "exif.UserComment",
+    ".avif": "exif.UserComment",
+}
 
 
 class ImageMetadataService:
@@ -43,6 +50,29 @@ class ImageMetadataService:
 
         with Image.open(image_path) as image:
             return "\n".join(self._build_metadata_list(image_path, image))
+
+    def extract_stable_diffusion_prompt(self, path: str) -> str | None:
+        """Stable Diffusion WebUIのPositive prompt部分を画像メタ情報から抽出する。"""
+
+        image_path = Path(path)
+        if not image_path.exists():
+            raise FileNotFoundError(f"画像ファイルが存在しません: {path}")
+        if not image_path.is_file():
+            raise ValueError(f"画像ファイルではありません: {path}")
+
+        target_key = PROMPT_METADATA_KEYS_BY_EXTENSION.get(image_path.suffix.lower())
+        if target_key is None:
+            return None
+
+        with Image.open(image_path) as image:
+            lines = self._build_metadata_list(image_path, image)
+
+        value = self._extract_metadata_value(lines, target_key)
+        if value is None:
+            return None
+
+        prompt = self._extract_positive_prompt(value).strip()
+        return prompt or None
 
     def _build_metadata_list(self, image_path: Path, image: Image.Image) -> list:
         lines = [
@@ -130,6 +160,44 @@ class ImageMetadataService:
             ]
 
         return [f"{key}: {text}"]
+
+    def _extract_metadata_value(self, lines: list[str], target_key: str) -> str | None:
+        """YAML風表示行から指定キーの値を復元する。"""
+
+        prefix = f"{target_key}:"
+        for index, line in enumerate(lines):
+            if not line.startswith(prefix):
+                continue
+
+            value = line[len(prefix):].lstrip()
+            if value == "|":
+                return self._extract_metadata_block(lines[index + 1:])
+            return value
+
+        return None
+
+    def _extract_metadata_block(self, lines: list[str]) -> str:
+        """YAML風ブロック形式のインデント本文を連結する。"""
+
+        block_lines: list[str] = []
+        for line in lines:
+            if not line.startswith("  "):
+                break
+            block_lines.append(line[2:])
+        return "\n".join(block_lines)
+
+    def _extract_positive_prompt(self, value: str) -> str:
+        """WebUIメタ情報本文からPositive promptだけを切り出す。"""
+
+        negative_index = value.find("Negative prompt:")
+        if negative_index >= 0:
+            return value[:negative_index]
+
+        steps_index = value.find("Steps:")
+        if steps_index >= 0:
+            return value[:steps_index]
+
+        return value
 
     def _to_text(self, value: Any, *, key: str = "") -> str:
         if isinstance(value, bytes):

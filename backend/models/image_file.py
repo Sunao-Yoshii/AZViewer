@@ -101,6 +101,51 @@ class SearchImageFilesResult:
 
 
 @dataclass(frozen=True)
+class PromptTagImportFailure:
+    """プロンプト一括タグ登録で失敗した画像1件分を表す。"""
+
+    id: int
+    path: str
+    reason: str
+
+    def to_dict(self) -> dict[str, object]:
+        """API返却用の辞書形式へ変換する。"""
+
+        return {
+            "id": self.id,
+            "path": self.path,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
+class PromptTagImportResult:
+    """プロンプト一括タグ登録処理の結果を表す。"""
+
+    target_count: int
+    processed_count: int
+    tagged_count: int
+    skipped_count: int
+    failed_count: int
+    failed_files: list[PromptTagImportFailure]
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "targetCount": self.target_count,
+            "processedCount": self.processed_count,
+            "taggedCount": self.tagged_count,
+            "skippedCount": self.skipped_count,
+            "failedCount": self.failed_count,
+            "failedFiles": [
+                item.to_dict()
+                for item in self.failed_files[:20]
+            ],
+        }
+
+
+@dataclass(frozen=True)
 class ImportResult:
     """画像ファイル登録処理の結果を表す。"""
 
