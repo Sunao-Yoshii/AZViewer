@@ -273,6 +273,28 @@ body {
   overflow: auto;
 }
 
+.tag-badge-close {
+  font-size: 0.55rem;
+}
+
+.tag-search-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  max-height: 18rem;
+  overflow: auto;
+}
+
+.tag-search-item {
+  cursor: pointer;
+}
+
+.tag-search-item.is-selected {
+  color: #fff;
+  background-color: #6c757d !important;
+  border-color: #6c757d !important;
+}
+
 .image-detail-body {
   min-height: 0;
   overflow: auto;

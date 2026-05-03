@@ -84,6 +84,10 @@ export async function fetchImageMetadata(path) {
   return await callBackendApi('fetch_image_metadata', { path })
 }
 
+export async function fetchTagsForSearch(payload = {}) {
+  return await callBackendApi('fetch_tags_for_search', payload)
+}
+
 export async function openContainingFolder(path) {
   return await callBackendApi('open_containing_folder', { path })
 }

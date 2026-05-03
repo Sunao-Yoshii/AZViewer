@@ -38,6 +38,7 @@ class ImageCatalogApi:
             rating=self._normalize_nullable_string(data.get("rating")),
             is_checked=data.get("is_checked"),
             is_favorite=data.get("is_favorite"),
+            tags=self._normalize_search_tags(data.get("tags")),
             page=int(data.get("page", 1) or 1),
             page_size=int(data.get("page_size", 25) or 25),
             sort=str(data.get("sort", "id_desc") or "id_desc"),
@@ -166,6 +167,38 @@ class ImageCatalogApi:
             data={"metadata": metadata},
         ).to_dict()
 
+    def fetch_tags_for_search(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """タグ検索ダイアログに表示するタグ候補を返す。"""
+
+        limit = 256
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            keyword = str(data.get("keyword") or "").strip()
+            limit = self._normalize_tag_search_limit(data.get("limit"))
+            repository = self._get_repository()
+            tags = repository.find_tags_for_search(keyword=keyword, limit=limit)
+            total_count = repository.count_tags_for_search(keyword=keyword)
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="タグ一覧を取得できませんでした。",
+                data={
+                    "tags": [],
+                    "total_count": 0,
+                    "limit": limit,
+                },
+            ).to_dict()
+
+        return ApiResponse(
+            success=True,
+            message="",
+            data={
+                "tags": [tag.to_dict() for tag in tags],
+                "total_count": total_count,
+                "limit": limit,
+            },
+        ).to_dict()
+
     def _get_repository(self) -> ImageFileRepository:
         """一覧系処理で利用するリポジトリを返す。"""
 
@@ -184,6 +217,29 @@ class ImageCatalogApi:
             return None
         normalized = str(value).strip()
         return normalized or None
+
+    def _normalize_search_tags(self, value: object) -> list[str]:
+        """検索条件用タグを空文字・重複除去し、最大3件へ丸める。"""
+
+        if not isinstance(value, list):
+            return []
+
+        tags: list[str] = []
+        for item in value:
+            tag = str(item or "").strip()
+            if not tag or tag in tags:
+                continue
+            tags.append(tag)
+        return tags[:3]
+
+    def _normalize_tag_search_limit(self, value: object) -> int:
+        """タグ候補取得件数を1から256の範囲へ丸める。"""
+
+        try:
+            limit = int(value or 256)
+        except (TypeError, ValueError):
+            limit = 256
+        return max(1, min(limit, 256))
 
     def _normalize_detail_payload(self, data: dict[str, Any]) -> dict[str, Any]:
         """詳細更新ペイロードをリポジトリ用の値へ正規化する。"""

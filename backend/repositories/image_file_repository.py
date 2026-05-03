@@ -4,7 +4,7 @@ from dataclasses import replace
 from math import ceil
 from sqlite3 import Connection
 
-from backend.models import ImageFileListItem, ImageFileRecord, SearchImageFilesResult
+from backend.models import ImageFileListItem, ImageFileRecord, SearchImageFilesResult, TagListItem
 
 
 class ImageFileRepository:
@@ -185,6 +185,7 @@ class ImageFileRepository:
         rating: str | None = None,
         is_checked: bool | int | None = None,
         is_favorite: bool | int | None = None,
+        tags: list[str] | None = None,
         page: int = 1,
         page_size: int = 25,
         sort: str = "id_desc",
@@ -193,25 +194,16 @@ class ImageFileRepository:
 
         safe_page = max(1, int(page))
         safe_page_size = max(1, int(page_size))
-        where_clauses: list[str] = []
-        params: list[object] = []
-
-        normalized_path = path.strip()
-        if normalized_path:
-            where_clauses.append("path LIKE ?")
-            params.append(f"%{normalized_path}%")
-
-        if rating:
-            where_clauses.append("rating = ?")
-            params.append(rating)
-
-        if self._normalize_true_condition(is_checked):
-            where_clauses.append("is_checked = 1")
-
-        if self._normalize_true_condition(is_favorite):
-            where_clauses.append("is_favorite = 1")
-
+        where_clauses, params = self._build_search_conditions(
+            path=path,
+            rating=rating,
+            is_checked=is_checked,
+            is_favorite=is_favorite,
+            tags=tags,
+        )
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
+        # print('Query:', f"SELECT COUNT(*) AS count FROM image_file_data {where_sql}")
+        # print('Params:', params)
         total_count = int(
             self._connection.execute(
                 f"SELECT COUNT(*) AS count FROM image_file_data {where_sql}",
@@ -248,6 +240,43 @@ class ImageFileRepository:
             total_pages=total_pages,
             page=safe_page,
             page_size=safe_page_size,
+        )
+
+    def find_tags_for_search(self, keyword: str | None = None, limit: int = 256) -> list[TagListItem]:
+        """タグ検索候補をID昇順で取得する。"""
+
+        params = self._build_tag_search_params(keyword, limit)
+        rows = self._connection.execute(
+            """
+            SELECT
+                id,
+                name
+            FROM tag
+            WHERE (:keyword = '' OR name LIKE :keyword_like)
+            ORDER BY id ASC
+            LIMIT :limit
+            """,
+            params,
+        ).fetchall()
+        return [
+            TagListItem(id=int(row["id"]), name=str(row["name"]))
+            for row in rows
+        ]
+
+    def count_tags_for_search(self, keyword: str | None = None) -> int:
+        """タグ検索候補の条件一致総数を取得する。"""
+
+        params = self._build_tag_search_params(keyword, 1)
+        return int(
+            self._connection.execute(
+                """
+                SELECT
+                    COUNT(*) AS count
+                FROM tag
+                WHERE (:keyword = '' OR name LIKE :keyword_like)
+                """,
+                params,
+            ).fetchone()["count"]
         )
 
     def delete_by_id(self, record_id: int) -> bool:
@@ -407,6 +436,78 @@ class ImageFileRepository:
             "rating_desc": "rating DESC, id DESC",
         }
         return mapping.get(sort, mapping["id_desc"])
+
+    def _build_search_conditions(
+        self,
+        *,
+        path: str,
+        rating: str | None,
+        is_checked: bool | int | None,
+        is_favorite: bool | int | None,
+        tags: list[str] | None,
+    ) -> tuple[list[str], list[object]]:
+        """画像検索のWHERE条件とパラメータを組み立てる。"""
+
+        where_clauses: list[str] = []
+        params: list[object] = []
+
+        normalized_path = path.strip()
+        if normalized_path:
+            where_clauses.append("path LIKE ?")
+            params.append(f"%{normalized_path}%")
+
+        if rating:
+            where_clauses.append("rating = ?")
+            params.append(rating)
+
+        if self._normalize_true_condition(is_checked):
+            where_clauses.append("is_checked = 1")
+
+        if self._normalize_true_condition(is_favorite):
+            where_clauses.append("is_favorite = 1")
+
+        self._append_tag_conditions(where_clauses, params, tags)
+        return where_clauses, params
+
+    def _append_tag_conditions(
+        self,
+        where_clauses: list[str],
+        params: list[object],
+        tags: list[str] | None,
+    ) -> None:
+        """タグAND検索条件をWHERE句へ追加する。"""
+
+        normalized_tags = [tag for tag in (tags or []) if tag]
+        if not normalized_tags:
+            return
+
+        placeholders = ", ".join("?" for _ in normalized_tags)
+        where_clauses.append(
+            f"""
+            id IN (
+                SELECT
+                    tag_image_link.image_file_id
+                FROM tag_image_link
+                INNER JOIN tag
+                    ON tag.id = tag_image_link.tag_id
+                WHERE tag.name IN ({placeholders})
+                GROUP BY tag_image_link.image_file_id
+                HAVING COUNT(DISTINCT tag.name) = ?
+            )
+            """
+        )
+        params.extend(normalized_tags)
+        params.append(len(normalized_tags))
+
+    def _build_tag_search_params(self, keyword: str | None, limit: int) -> dict[str, object]:
+        """タグ候補検索SQL用のパラメータを作る。"""
+
+        normalized_keyword = (keyword or "").strip()
+        return {
+            "keyword": normalized_keyword,
+            "keyword_like": f"%{normalized_keyword}%",
+            "limit": max(1, min(int(limit), 256)),
+        }
 
     def _normalize_true_condition(self, value: bool | int | None) -> bool:
         """検索条件値をtrue条件として評価する。"""

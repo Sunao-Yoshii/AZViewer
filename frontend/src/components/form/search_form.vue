@@ -1,5 +1,9 @@
 <script setup>
-defineProps({
+import { reactive, ref } from 'vue'
+import { fetchTagsForSearch } from '../../services/backendApi'
+import TagSearchModal from './TagSearchModal.vue'
+
+const props = defineProps({
   filters: {
     type: Object,
     required: true,
@@ -11,6 +15,13 @@ defineProps({
 })
 
 const emit = defineEmits(['search'])
+const showTagSearchModal = ref(false)
+const tagSearchState = reactive({
+  items: [],
+  totalCount: 0,
+  isLoading: false,
+  message: '',
+})
 
 const ratingOptions = [
   { label: 'すべて', value: '' },
@@ -19,6 +30,53 @@ const ratingOptions = [
   { label: 'R-18', value: 'R-18' },
   { label: 'R-18G', value: 'R-18G' },
 ]
+
+function removeSearchTag(tag) {
+  props.filters.tags = (props.filters.tags ?? []).filter((value) => value !== tag)
+}
+
+async function openTagSearchModal() {
+  showTagSearchModal.value = true
+  await handleSearchTags({ keyword: '' })
+}
+
+function closeTagSearchModal() {
+  showTagSearchModal.value = false
+}
+
+function applyTags(tags) {
+  props.filters.tags = [...tags].slice(0, 3)
+  showTagSearchModal.value = false
+}
+
+async function handleSearchTags({ keyword }) {
+  tagSearchState.isLoading = true
+  tagSearchState.message = ''
+
+  try {
+    const result = await fetchTagsForSearch({
+      keyword: keyword ?? '',
+      limit: 256,
+    })
+    if (!result.success) {
+      applyTagSearchFailure(result.message)
+      return
+    }
+
+    tagSearchState.items = result.data?.tags ?? []
+    tagSearchState.totalCount = result.data?.total_count ?? 0
+  } catch {
+    applyTagSearchFailure()
+  } finally {
+    tagSearchState.isLoading = false
+  }
+}
+
+function applyTagSearchFailure(message = 'タグ一覧を取得できませんでした。') {
+  tagSearchState.items = []
+  tagSearchState.totalCount = 0
+  tagSearchState.message = message || 'タグ一覧を取得できませんでした。'
+}
 </script>
 
 <template>
@@ -71,6 +129,38 @@ const ratingOptions = [
       <label class="form-check-label small" for="searchFavorite">お気に入りのみ</label>
     </div>
 
+    <div>
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="form-label small fw-semibold mb-0">タグ</span>
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          :disabled="isBusy"
+          @click="openTagSearchModal"
+        >
+          タグ選択
+        </button>
+      </div>
+
+      <div v-if="filters.tags?.length" class="d-flex flex-wrap gap-1">
+        <span
+          v-for="tag in filters.tags"
+          :key="tag"
+          class="badge text-bg-secondary"
+        >
+          {{ tag }}
+          <button
+            type="button"
+            class="btn-close btn-close-white ms-1 tag-badge-close"
+            aria-label="タグを検索条件から削除"
+            :disabled="isBusy"
+            @click="removeSearchTag(tag)"
+          ></button>
+        </span>
+      </div>
+      <div v-else class="small text-secondary">未指定</div>
+    </div>
+
     <button
       type="button"
       class="btn btn-primary btn-sm w-100"
@@ -80,5 +170,17 @@ const ratingOptions = [
       <i class="bi bi-search me-1" aria-hidden="true"></i>
       検索
     </button>
+
+    <TagSearchModal
+      :show="showTagSearchModal"
+      :selected-tags="filters.tags ?? []"
+      :tag-items="tagSearchState.items"
+      :total-count="tagSearchState.totalCount"
+      :is-loading="tagSearchState.isLoading"
+      :external-message="tagSearchState.message"
+      @close="closeTagSearchModal"
+      @apply="applyTags"
+      @search-tags="handleSearchTags"
+    />
   </div>
 </template>

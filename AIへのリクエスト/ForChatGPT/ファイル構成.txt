@@ -29,6 +29,7 @@ AZViewer/
       dialog_service.py
       file_scan_service.py
       image_file_import_service.py
+      image_metadata_service.py
       startup_cleanup_service.py
       tag_normalize_service.py
       thumbnail_cache_service.py
@@ -60,6 +61,7 @@ AZViewer/
           display.vue
           edit.vue
           ImageDetailModal.vue
+          ImageMetadataModal.vue
           tile.vue
         upload/
           ErrorModal.vue
@@ -68,6 +70,7 @@ AZViewer/
         useAppStatus.js
         useImageDetail.js
         useImageImport.js
+        useImageMetadata.js
         useImageMutations.js
         useImageSearch.js
         useLoadingOverlay.js
@@ -78,3 +81,5 @@ AZViewer/
       styles/
         app.css
     vite.config.js
+  Pipfile
+  Pipfile.lock

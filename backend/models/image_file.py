@@ -47,6 +47,22 @@ class ImageFileListItem:
 
 
 @dataclass(frozen=True)
+class TagListItem:
+    """タグ検索候補の1件分データを表す。"""
+
+    id: int
+    name: str
+
+    def to_dict(self) -> dict[str, object]:
+        """API返却用の辞書形式へ変換する。"""
+
+        return {
+            "id": self.id,
+            "name": self.name,
+        }
+
+
+@dataclass(frozen=True)
 class SearchImageFilesResult:
     """画像一覧検索結果を表す。"""
 
