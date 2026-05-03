@@ -1,6 +1,8 @@
 AZViewer/
   .env.example
   .gitignore
+  Pipfile
+  Pipfile.lock
   backend/
     __init__.py
     api/
@@ -50,6 +52,8 @@ AZViewer/
           LoadingOverlay.vue
           pagination.vue
         form/
+          FolderSearchModal.vue
+          TagSearchModal.vue
           search_form.vue
         layout/
           AppFooter.vue
@@ -58,10 +62,10 @@ AZViewer/
           Content.vue
           MainLayout.vue
         tile/
-          display.vue
-          edit.vue
           ImageDetailModal.vue
           ImageMetadataModal.vue
+          display.vue
+          edit.vue
           tile.vue
         upload/
           ErrorModal.vue
@@ -81,5 +85,3 @@ AZViewer/
       styles/
         app.css
     vite.config.js
-  Pipfile
-  Pipfile.lock
