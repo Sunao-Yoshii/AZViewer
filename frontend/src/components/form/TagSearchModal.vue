@@ -100,7 +100,8 @@ function handleApply() {
                 <span
                   v-for="tag in workingSelectedTags"
                   :key="tag"
-                  class="badge text-bg-secondary"
+                  class="badge text-bg-secondary tag-badge tag-badge--editable"
+                  :title="tag"
                 >
                   {{ tag }}
                   <button
@@ -149,8 +150,9 @@ function handleApply() {
                 v-for="tag in tagItems"
                 :key="tag.id"
                 type="button"
-                class="badge text-bg-light border search-candidate-item"
+                class="badge text-bg-light border search-candidate-item tag-badge tag-badge--search"
                 :class="{ 'is-selected': workingSelectedTags.includes(tag.name) }"
+                :title="tag.name"
                 @click="addTag(tag.name)"
               >
                 {{ tag.name }}

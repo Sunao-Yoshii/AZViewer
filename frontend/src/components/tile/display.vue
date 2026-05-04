@@ -44,7 +44,8 @@ const ratingBadgeClass = (rating) => {
     <span
       v-for="tag in item.tags"
       :key="tag"
-      class="badge text-bg-secondary"
+      class="badge text-bg-secondary tag-badge tag-badge--tile"
+      :title="tag"
     >
       {{ tag }}
     </span>

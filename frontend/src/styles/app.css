@@ -278,6 +278,34 @@ body {
   overflow: auto;
 }
 
+.tag-badge {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-align: left;
+  line-height: 1.35;
+}
+
+.tag-badge--tile {
+  display: inline-block;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-badge--editable {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+}
+
+.tag-badge--search {
+  display: inline-block;
+  cursor: pointer;
+}
+
 .metadata-modal-title {
   overflow-wrap: anywhere;
   word-break: break-word;

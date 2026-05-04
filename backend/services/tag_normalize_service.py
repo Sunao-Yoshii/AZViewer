@@ -4,7 +4,7 @@ import re
 
 BRACKET_CHARS = frozenset("()[]{}")
 TRAILING_WEIGHT = re.compile(r":\d+(?:\.\d+)?$")
-MAX_TAG_LENGTH = 128
+MAX_TAG_NAME_LENGTH = 512
 
 
 class TagNormalizeService:
@@ -36,8 +36,8 @@ class TagNormalizeService:
             tag = self._normalize_tag_text(part)
             if not tag:
                 continue
-            if len(tag) > MAX_TAG_LENGTH:
-                raise ValueError("tag must be 128 characters or less.")
+            if len(tag) > MAX_TAG_NAME_LENGTH:
+                raise ValueError(f"tag must be {MAX_TAG_NAME_LENGTH} characters or less.")
             tags.append(tag)
         return tags
 

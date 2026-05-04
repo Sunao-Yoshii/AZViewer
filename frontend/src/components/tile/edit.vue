@@ -12,6 +12,7 @@ const emit = defineEmits(['cancel', 'save', 'open-metadata'])
 
 const ratingOptions = ['General', 'R-15', 'R-18', 'R-18G']
 const BRACKET_CHARS = new Set(['(', ')', '[', ']', '{', '}'])
+const MAX_TAG_NAME_LENGTH = 512
 const form = ref(createFormState(props.item))
 const tagError = ref('')
 
@@ -81,9 +82,9 @@ function addTagsFromInput() {
     .map(normalizeTagText)
     .filter(Boolean)
 
-  const tooLong = normalizedTags.find((tag) => tag.length > 128)
+  const tooLong = normalizedTags.find((tag) => tag.length > MAX_TAG_NAME_LENGTH)
   if (tooLong) {
-    tagError.value = 'タグは128文字以内で入力してください。'
+    tagError.value = `タグは${MAX_TAG_NAME_LENGTH}文字以内で入力してください。`
     return
   }
 
@@ -194,7 +195,8 @@ defineExpose({
         <span
           v-for="tag in form.tags"
           :key="tag"
-          class="badge text-bg-secondary"
+          class="badge text-bg-secondary tag-badge tag-badge--editable"
+          :title="tag"
         >
           {{ tag }}
           <button

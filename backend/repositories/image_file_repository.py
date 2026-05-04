@@ -45,7 +45,7 @@ class ImageFileRepository:
             CREATE TABLE IF NOT EXISTS tag (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL UNIQUE,
-                CHECK (length(name) <= 128)
+                CHECK (length(name) <= 512)
             )
             """
         )
