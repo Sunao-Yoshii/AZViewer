@@ -21,6 +21,13 @@ body {
   z-index: 10;
 }
 
+.app-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .app-footer {
   display: flex;
   align-items: center;

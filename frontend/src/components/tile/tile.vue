@@ -81,7 +81,7 @@ function applyMetadataTextToTagInput(value) {
             class="form-check-input image-tile-select-checkbox"
             :checked="selected"
             :disabled="isSearching"
-            aria-label="削除対象として選択"
+            aria-label="画像を選択"
             @change="$emit('selection-change', { id: item.id, selected: $event.target.checked })"
           />
           <span class="image-tile-title text-truncate" :title="item.filename">

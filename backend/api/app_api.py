@@ -104,6 +104,11 @@ class AppApi:
 
         return self._image_catalog_api.delete_image_files_with_physical_files(payload)
 
+    def move_image_files_to_folder(self, payload: dict[str, object]) -> dict[str, object]:
+        """指定レコードの実ファイルを指定フォルダへ一括移動する。"""
+
+        return self._image_catalog_api.move_image_files_to_folder(payload)
+
     def fetchLocalImage(self, payload: dict[str, object]) -> dict[str, object]:
         """ローカル画像の本体を表示用データURLとして返す。"""
 

@@ -398,6 +398,32 @@ class ImageFileRepository:
         self._connection.commit()
         return cursor.rowcount
 
+    def update_paths(self, updates: list[dict[str, object]]) -> int:
+        """指定ID群のパスとフォルダを更新し、更新件数を返す。"""
+
+        if not updates:
+            return 0
+
+        try:
+            cursor = self._connection.executemany(
+                """
+                UPDATE image_file_data
+                SET
+                    path = :path,
+                    folder = :folder
+                WHERE id = :id
+                """,
+                updates,
+            )
+            updated_count = cursor.rowcount
+            if updated_count != len(updates):
+                raise RuntimeError("Some image file paths could not be updated.")
+            self._connection.commit()
+            return updated_count
+        except Exception:
+            self._connection.rollback()
+            raise
+
     def update_detail(
         self,
         record_id: int,

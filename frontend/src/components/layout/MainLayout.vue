@@ -35,6 +35,7 @@ defineEmits([
   'import-complete',
   'import-prompt-tags',
   'delete-selected-images',
+  'move-selected-images',
   'selection-change',
   'change-page',
   'change-page-size',
@@ -53,6 +54,7 @@ defineEmits([
       :selected-count="selectedCount"
       @import-prompt-tags="$emit('import-prompt-tags')"
       @delete-selected-images="$emit('delete-selected-images')"
+      @move-selected-images="$emit('move-selected-images')"
     />
 
     <div class="app-body d-flex">

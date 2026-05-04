@@ -193,6 +193,49 @@ class PhysicalDeleteResult:
 
 
 @dataclass(frozen=True)
+class FileMoveFailure:
+    """ファイル移動で失敗した画像1件分を表す。"""
+
+    id: int
+    path: str
+    reason: str
+
+    def to_dict(self) -> dict[str, object]:
+        """API返却用の辞書形式へ変換する。"""
+
+        return {
+            "id": self.id,
+            "path": self.path,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
+class FileMoveResult:
+    """画像ファイルの一括移動処理結果を表す。"""
+
+    target_count: int
+    moved_count: int
+    skipped_count: int
+    failed_count: int
+    failed_files: list[FileMoveFailure]
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "targetCount": self.target_count,
+            "movedCount": self.moved_count,
+            "skippedCount": self.skipped_count,
+            "failedCount": self.failed_count,
+            "failedFiles": [
+                item.to_dict()
+                for item in self.failed_files[:20]
+            ],
+        }
+
+
+@dataclass(frozen=True)
 class ImportResult:
     """画像ファイル登録処理の結果を表す。"""
 

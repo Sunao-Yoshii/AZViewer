@@ -1,6 +1,8 @@
 import {
   deleteImageFile,
   deleteImageFilesWithPhysicalFiles,
+  moveImageFilesToFolder,
+  selectFolderDialog,
   updateImageFileDetail,
 } from '../services/backendApi'
 
@@ -30,6 +32,52 @@ function pushPhysicalDeleteResultToast(pushToast, result, targetCount) {
   pushToast({
     type: 'success',
     message: `選択画像の削除が完了しました。対象: ${data.targetCount ?? targetCount} 件 / 削除: ${data.deletedRecordCount ?? 0} 件`,
+  })
+}
+
+function buildMoveConfirmMessage(count, destinationFolder) {
+  return [
+    `選択した ${count} 件の画像ファイルを移動します。`,
+    '',
+    '移動先:',
+    destinationFolder,
+    '',
+    '移動後は AZViewer 上の登録パスも更新されます。',
+    '実行しますか？',
+  ].join('\n')
+}
+
+function extractSelectedFolderPath(result) {
+  const items = result?.data?.items ?? []
+  const folderItem = items.find((item) => item?.type === 'directory')
+  return folderItem?.path || ''
+}
+
+function pushMoveResultToast(pushToast, result, targetCount) {
+  const data = result?.data ?? {}
+  const failedCount = data.failedCount ?? 0
+  const movedCount = data.movedCount ?? 0
+  const skippedCount = data.skippedCount ?? 0
+
+  if (failedCount > 0 && movedCount === 0 && skippedCount === 0) {
+    pushToast({
+      type: 'warning',
+      message: `画像ファイルを移動できませんでした。対象: ${data.targetCount ?? targetCount} 件 / 失敗: ${failedCount} 件`,
+    })
+    return
+  }
+
+  if (failedCount > 0) {
+    pushToast({
+      type: 'warning',
+      message: `一部画像ファイルの移動に失敗しました。対象: ${data.targetCount ?? targetCount} 件 / 移動: ${movedCount} 件 / スキップ: ${skippedCount} 件 / 失敗: ${failedCount} 件`,
+    })
+    return
+  }
+
+  pushToast({
+    type: 'success',
+    message: `画像ファイルの移動が完了しました。対象: ${data.targetCount ?? targetCount} 件 / 移動: ${movedCount} 件 / スキップ: ${skippedCount} 件`,
   })
 }
 
@@ -79,6 +127,47 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     }
   }
 
+  async function moveSelectedImages({ ids, refresh: refreshSelected, clearSelection }) {
+    const targetIds = [...(ids ?? [])]
+    if (targetIds.length === 0) {
+      return
+    }
+
+    const folderResult = await selectFolderDialog()
+    if (!folderResult?.success) {
+      return
+    }
+
+    const destinationFolder = extractSelectedFolderPath(folderResult)
+    if (!destinationFolder || !window.confirm(buildMoveConfirmMessage(targetIds.length, destinationFolder))) {
+      return
+    }
+
+    loading?.showLoading(
+      '画像ファイルを移動中',
+      '実ファイルの移動と登録情報の更新を行っています...'
+    )
+
+    try {
+      const result = await moveImageFilesToFolder({
+        ids: targetIds,
+        destinationFolder,
+      })
+      if (!result?.success) {
+        pushToast({ type: 'danger', message: result?.message || '画像ファイルの移動に失敗しました。' })
+        return
+      }
+
+      pushMoveResultToast(pushToast, result, targetIds.length)
+      clearSelection?.()
+      await refreshSelected?.()
+    } catch (error) {
+      pushToast({ type: 'danger', message: '画像ファイルの移動に失敗しました。' })
+    } finally {
+      loading?.hideLoading()
+    }
+  }
+
   async function handleSaveDetail(payload) {
     const result = await updateImageFileDetail(payload)
     if (!result.success) {
@@ -92,5 +181,6 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     deleteSelectedImages,
     handleDelete,
     handleSaveDetail,
+    moveSelectedImages,
   }
 }

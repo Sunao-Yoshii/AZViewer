@@ -1,4 +1,6 @@
 from .image_file import (
+    FileMoveFailure,
+    FileMoveResult,
     FolderListItem,
     ImageFileRecord,
     ImportResult,
@@ -12,6 +14,8 @@ from .image_file import (
 )
 
 __all__ = [
+    "FileMoveFailure",
+    "FileMoveResult",
     "FolderListItem",
     "ImageFileRecord",
     "ImportResult",

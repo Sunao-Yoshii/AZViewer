@@ -2,11 +2,19 @@ from __future__ import annotations
 
 import base64
 import mimetypes
+import shutil
 from pathlib import Path
 from typing import Any
 
 from backend.repositories import ImageFileRepository
-from backend.models import PhysicalDeleteFailure, PhysicalDeleteResult, PromptTagImportResult
+from backend.models import (
+    FileMoveFailure,
+    FileMoveResult,
+    ImageFileListItem,
+    PhysicalDeleteFailure,
+    PhysicalDeleteResult,
+    PromptTagImportResult,
+)
 from backend.services import ImageMetadataService, PromptTagImportService, TagNormalizeService, ThumbnailCacheService
 
 from .api_response import ApiResponse
@@ -127,6 +135,44 @@ class ImageCatalogApi:
                 success=False,
                 message="選択画像の削除に失敗しました。",
                 data=self._empty_physical_delete_data(),
+            ).to_dict()
+
+    def move_image_files_to_folder(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定レコードの実ファイルを指定フォルダへ一括移動する。"""
+
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            record_ids = self._normalize_record_ids(data.get("ids"))
+            if not record_ids:
+                return ApiResponse(
+                    success=False,
+                    message="移動対象が指定されていません。",
+                    data=self._empty_file_move_data(),
+                ).to_dict()
+
+            try:
+                destination_folder = self._normalize_destination_folder(data.get("destinationFolder"))
+            except ValueError as exc:
+                return ApiResponse(
+                    success=False,
+                    message=str(exc),
+                    data=self._empty_file_move_data(),
+                ).to_dict()
+
+            repository = self._get_repository()
+            items = repository.find_by_ids(record_ids)
+            result = self._move_files_and_update_records(repository, items, destination_folder)
+            message = (
+                "一部画像ファイルの移動に失敗しました。"
+                if result.failed_count > 0
+                else "画像ファイルの移動が完了しました。"
+            )
+            return ApiResponse(success=True, message=message, data=result.to_api_data()).to_dict()
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="画像ファイルの移動に失敗しました。",
+                data=self._empty_file_move_data(),
             ).to_dict()
 
     def fetchLocalImage(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -361,6 +407,11 @@ class ImageCatalogApi:
     def _normalize_delete_ids(self, value: object) -> list[int]:
         """一括削除対象IDを正の整数の重複なしリストへ正規化する。"""
 
+        return self._normalize_record_ids(value)
+
+    def _normalize_record_ids(self, value: object) -> list[int]:
+        """レコードIDを正の整数の重複なしリストへ正規化する。"""
+
         if not isinstance(value, list):
             return []
 
@@ -376,6 +427,20 @@ class ImageCatalogApi:
             record_ids.append(record_id)
         return record_ids
 
+    def _normalize_destination_folder(self, value: object) -> Path:
+        """移動先フォルダを絶対パス化し、存在するディレクトリか検証する。"""
+
+        folder_text = str(value or "").strip()
+        if not folder_text:
+            raise ValueError("移動先フォルダが指定されていません。")
+
+        folder_path = Path(folder_text).expanduser().resolve()
+        if not folder_path.exists():
+            raise ValueError("移動先フォルダが存在しません。")
+        if not folder_path.is_dir():
+            raise ValueError("移動先がフォルダではありません。")
+        return folder_path
+
     def _empty_physical_delete_data(self) -> dict[str, object]:
         """一括物理削除API用の空結果データを返す。"""
 
@@ -385,6 +450,17 @@ class ImageCatalogApi:
             deleted_thumbnail_count=0,
             deleted_record_count=0,
             missing_file_count=0,
+            failed_count=0,
+            failed_files=[],
+        ).to_api_data()
+
+    def _empty_file_move_data(self) -> dict[str, object]:
+        """一括ファイル移動API用の空結果データを返す。"""
+
+        return FileMoveResult(
+            target_count=0,
+            moved_count=0,
+            skipped_count=0,
             failed_count=0,
             failed_files=[],
         ).to_api_data()
@@ -457,6 +533,176 @@ class ImageCatalogApi:
 
         image_path.unlink()
         return True, False
+
+    def _move_files_and_update_records(
+        self,
+        repository: ImageFileRepository,
+        items: list[ImageFileListItem],
+        destination_folder: Path,
+    ) -> FileMoveResult:
+        """移動可能な実ファイルを移動し、成功分だけDBパスを更新する。"""
+
+        move_plan = self._move_files(repository, items, destination_folder)
+        moved_items = move_plan["moved_items"]
+        failed_count = move_plan["failed_count"]
+        failed_files = move_plan["failed_files"]
+
+        if moved_items:
+            try:
+                repository.update_paths(self._build_path_updates(moved_items))
+            except Exception:
+                restored_failures = self._restore_moved_files(moved_items)
+                failed_count += len(moved_items)
+                failed_files.extend(restored_failures)
+                moved_items = []
+
+        return FileMoveResult(
+            target_count=len(items),
+            moved_count=len(moved_items),
+            skipped_count=move_plan["skipped_count"],
+            failed_count=failed_count,
+            failed_files=failed_files,
+        )
+
+    def _move_files(
+        self,
+        repository: ImageFileRepository,
+        items: list[ImageFileListItem],
+        destination_folder: Path,
+    ) -> dict[str, Any]:
+        """各画像ファイルを移動し、DB更新候補と失敗情報を集計する。"""
+
+        moved_items: list[dict[str, object]] = []
+        failed_files: list[FileMoveFailure] = []
+        failed_count = 0
+        skipped_count = 0
+
+        for item in items:
+            try:
+                moved_item = self._move_one_file(repository, item, destination_folder)
+                if moved_item is None:
+                    skipped_count += 1
+                else:
+                    moved_items.append(moved_item)
+            except Exception as exc:
+                failed_count += 1
+                self._append_file_move_failure(failed_files, item.id, item.path, exc)
+
+        return {
+            "moved_items": moved_items,
+            "skipped_count": skipped_count,
+            "failed_count": failed_count,
+            "failed_files": failed_files,
+        }
+
+    def _move_one_file(
+        self,
+        repository: ImageFileRepository,
+        item: ImageFileListItem,
+        destination_folder: Path,
+    ) -> dict[str, object] | None:
+        """1画像ファイルを移動し、DB更新候補を返す。同一パスならNoneを返す。"""
+
+        source_path = Path(item.path)
+        if not source_path.exists():
+            raise FileNotFoundError("移動元ファイルが存在しません。")
+        if not source_path.is_file():
+            raise ValueError("画像ファイルではありません。")
+
+        destination_path = destination_folder / source_path.name
+        if source_path.resolve() == destination_path.resolve():
+            return None
+        if destination_path.exists():
+            raise FileExistsError("移動先に同名ファイルが既に存在します。")
+        if repository.exists_by_path(str(destination_path)):
+            raise ValueError("移動後パスは既に登録済みです。")
+
+        shutil.move(str(source_path), str(destination_path))
+        return {
+            "id": item.id,
+            "old_path": str(source_path),
+            "new_path": str(destination_path),
+            "folder": destination_path.parent.name,
+        }
+
+    def _build_path_updates(self, moved_items: list[dict[str, object]]) -> list[dict[str, object]]:
+        """DBのpath/folder更新用ペイロードを作る。"""
+
+        return [
+            {
+                "id": item["id"],
+                "path": item["new_path"],
+                "folder": item["folder"],
+            }
+            for item in moved_items
+        ]
+
+    def _restore_moved_files(self, moved_items: list[dict[str, object]]) -> list[FileMoveFailure]:
+        """DB更新失敗時に移動済みファイルを元へ戻し、失敗情報を返す。"""
+
+        failures: list[FileMoveFailure] = []
+        for item in moved_items:
+            try:
+                new_path = Path(str(item["new_path"]))
+                old_path = Path(str(item["old_path"]))
+                if new_path.exists() and not old_path.exists():
+                    shutil.move(str(new_path), str(old_path))
+                self._append_file_move_message(
+                    failures,
+                    int(item["id"]),
+                    str(item["old_path"]),
+                    "DB 更新に失敗したため、ファイル移動を取り消しました。",
+                )
+            except Exception:
+                self._append_file_move_message(
+                    failures,
+                    int(item["id"]),
+                    str(item["new_path"]),
+                    "DB 更新に失敗し、移動済みファイルの復元にも失敗しました。",
+                )
+        return failures
+
+    def _append_file_move_failure(
+        self,
+        failed_files: list[FileMoveFailure],
+        record_id: int,
+        path: str,
+        error: Exception,
+    ) -> None:
+        """ファイル移動失敗情報を最大20件まで追加する。"""
+
+        self._append_file_move_message(
+            failed_files,
+            record_id,
+            path,
+            self._to_file_move_failure_reason(error),
+        )
+
+    def _append_file_move_message(
+        self,
+        failed_files: list[FileMoveFailure],
+        record_id: int,
+        path: str,
+        reason: str,
+    ) -> None:
+        """ファイル移動失敗メッセージを最大20件まで追加する。"""
+
+        if len(failed_files) >= 20:
+            return
+        failed_files.append(FileMoveFailure(id=record_id, path=path, reason=reason))
+
+    def _to_file_move_failure_reason(self, error: Exception) -> str:
+        """ファイル移動例外をユーザー向け理由へ変換する。"""
+
+        if isinstance(error, FileNotFoundError):
+            return "移動元ファイルが存在しません。"
+        if isinstance(error, FileExistsError):
+            return "移動先に同名ファイルが既に存在します。"
+        if isinstance(error, PermissionError):
+            return "ファイルへアクセスできません。別のアプリで使用中の可能性があります。"
+        if isinstance(error, ValueError):
+            return str(error)
+        return "ファイルを移動できませんでした。"
 
     def _update_detail_with_tags(self, detail: dict[str, Any], tags: list[str]) -> bool:
         """詳細項目とタグリンクを同一トランザクションで更新する。"""

@@ -52,6 +52,7 @@ const {
   deleteSelectedImages,
   handleDelete,
   handleSaveDetail,
+  moveSelectedImages,
 } = useImageMutations({
   pushToast,
   setStatus,
@@ -114,6 +115,14 @@ async function handleDeleteSelectedImages() {
   })
 }
 
+async function handleMoveSelectedImages() {
+  await moveSelectedImages({
+    ids: selectedImageIds.value,
+    refresh: executeSearch,
+    clearSelection,
+  })
+}
+
 function handleImportStartedEvent() {
   loading.showLoading('登録中', 'ドロップされた画像ファイルを登録しています。しばらくお待ちください。')
 }
@@ -157,6 +166,7 @@ onBeforeUnmount(() => {
     @import-complete="handleImportCompleteWithSelectionClear"
     @import-prompt-tags="handleImportPromptTags"
     @delete-selected-images="handleDeleteSelectedImages"
+    @move-selected-images="handleMoveSelectedImages"
   >
     <Content
       :search-result="searchResult"

@@ -76,6 +76,10 @@ export async function deleteImageFilesWithPhysicalFiles(payload) {
   return await callBackendApi('delete_image_files_with_physical_files', payload)
 }
 
+export async function moveImageFilesToFolder(payload) {
+  return await callBackendApi('move_image_files_to_folder', payload)
+}
+
 export async function fetchLocalImage(path) {
   return await callBackendApi('fetchLocalImage', { path })
 }
