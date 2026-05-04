@@ -53,6 +53,7 @@ AZViewer/
           LoadingOverlay.vue
           pagination.vue
         form/
+          DuplicateTagSetModal.vue
           FolderSearchModal.vue
           search_form.vue
           TagSearchModal.vue
@@ -73,6 +74,7 @@ AZViewer/
           FileSelectArea.vue
       composables/
         useAppStatus.js
+        useDuplicateTagSetSearch.js
         useImageDetail.js
         useImageImport.js
         useImageMetadata.js

@@ -1,10 +1,18 @@
 from __future__ import annotations
 
+import hashlib
 from dataclasses import replace
 from math import ceil
 from sqlite3 import Connection
 
-from backend.models import FolderListItem, ImageFileListItem, ImageFileRecord, SearchImageFilesResult, TagListItem
+from backend.models import (
+    DuplicateTagSetItem,
+    FolderListItem,
+    ImageFileListItem,
+    ImageFileRecord,
+    SearchImageFilesResult,
+    TagListItem,
+)
 
 
 class ImageFileRepository:
@@ -56,7 +64,37 @@ class ImageFileRepository:
             )
             """
         )
+        self._create_tag_hash_table()
         self._connection.commit()
+
+    def _create_tag_hash_table(self) -> None:
+        """タグ構成検索用の派生インデックステーブルを作成する。"""
+
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS tag_hash (
+                image_file_data_id INTEGER PRIMARY KEY,
+                tag_names TEXT NOT NULL,
+                tag_set TEXT NOT NULL,
+                hash TEXT NOT NULL,
+                FOREIGN KEY (image_file_data_id)
+                    REFERENCES image_file_data(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+        self._connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tag_hash_hash
+            ON tag_hash(hash)
+            """
+        )
+        self._connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tag_hash_hash_tag_set
+            ON tag_hash(hash, tag_set)
+            """
+        )
 
     def find_all_paths(self) -> list[str]:
         """登録済み画像ファイルのパス一覧を取得する。"""
@@ -116,6 +154,7 @@ class ImageFileRepository:
             return []
 
         record_ids = self.find_ids_by_paths(paths)
+        self.delete_tag_hashes(record_ids)
 
         self._connection.executemany(
             "DELETE FROM image_file_data WHERE path = ?",
@@ -238,6 +277,8 @@ class ImageFileRepository:
         is_favorite: bool | int | None = None,
         tags: list[str] | None = None,
         folder: str | None = None,
+        tag_hash: str | None = None,
+        tag_set: str | None = None,
         page: int = 1,
         page_size: int = 25,
         sort: str = "id_desc",
@@ -253,6 +294,8 @@ class ImageFileRepository:
             is_favorite=is_favorite,
             tags=tags,
             folder=folder,
+            tag_hash=tag_hash,
+            tag_set=tag_set,
         )
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         total_count = int(
@@ -377,6 +420,7 @@ class ImageFileRepository:
     def delete_by_id(self, record_id: int) -> bool:
         """IDに一致する画像ファイル情報を削除する。"""
 
+        self.delete_tag_hash(record_id)
         cursor = self._connection.execute(
             "DELETE FROM image_file_data WHERE id = ?",
             (record_id,),
@@ -391,6 +435,7 @@ class ImageFileRepository:
             return 0
 
         placeholders = ", ".join("?" for _ in record_ids)
+        self.delete_tag_hashes(record_ids)
         cursor = self._connection.execute(
             f"DELETE FROM image_file_data WHERE id IN ({placeholders})",
             record_ids,
@@ -494,6 +539,7 @@ class ImageFileRepository:
                 """,
                 (image_file_id, tag_id),
             )
+        self.replace_tag_hash(image_file_id)
 
     def replace_tags_atomic(self, image_file_id: int, tags: list[str]) -> None:
         """指定画像のタグリンク置換を1トランザクションで完結させる。"""
@@ -530,6 +576,151 @@ class ImageFileRepository:
             return None
         item = self._row_to_item(row)
         return self._attach_tags([item])[0]
+
+    def replace_tag_hash(self, image_file_id: int) -> None:
+        """指定画像の現在のタグ構成からtag_hashを更新する。"""
+
+        rows = self._connection.execute(
+            """
+            SELECT
+                tag.id,
+                tag.name
+            FROM tag_image_link
+            INNER JOIN tag ON tag.id = tag_image_link.tag_id
+            WHERE tag_image_link.image_file_id = ?
+            ORDER BY tag.id ASC
+            """,
+            (image_file_id,),
+        ).fetchall()
+        if not rows:
+            self.delete_tag_hash(image_file_id)
+            return
+
+        tag_set = ",".join(str(int(row["id"])) for row in rows)
+        tag_names = ",".join(str(row["name"]) for row in rows)
+        self._connection.execute(
+            """
+            INSERT INTO tag_hash (
+                image_file_data_id,
+                tag_names,
+                tag_set,
+                hash
+            )
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(image_file_data_id)
+            DO UPDATE SET
+                tag_names = excluded.tag_names,
+                tag_set = excluded.tag_set,
+                hash = excluded.hash
+            """,
+            (image_file_id, tag_names, tag_set, self._build_tag_hash_value(tag_set)),
+        )
+
+    def delete_tag_hash(self, image_file_id: int) -> None:
+        """指定画像のtag_hashを削除する。"""
+
+        self._connection.execute(
+            "DELETE FROM tag_hash WHERE image_file_data_id = ?",
+            (image_file_id,),
+        )
+
+    def delete_tag_hashes(self, image_file_ids: list[int]) -> None:
+        """指定画像群のtag_hashを削除する。"""
+
+        if not image_file_ids:
+            return
+
+        placeholders = ", ".join("?" for _ in image_file_ids)
+        self._connection.execute(
+            f"DELETE FROM tag_hash WHERE image_file_data_id IN ({placeholders})",
+            image_file_ids,
+        )
+
+    def count_tag_hashes(self) -> int:
+        """tag_hashの件数を返す。"""
+
+        return int(
+            self._connection.execute(
+                "SELECT COUNT(*) AS count FROM tag_hash"
+            ).fetchone()["count"]
+        )
+
+    def rebuild_all_tag_hashes(self) -> int:
+        """既存タグリンクからtag_hashを全件再構築し、作成件数を返す。"""
+
+        self._connection.execute("DELETE FROM tag_hash")
+        rows = self._connection.execute(
+            """
+            SELECT DISTINCT image_file_id
+            FROM tag_image_link
+            ORDER BY image_file_id ASC
+            """
+        ).fetchall()
+        for row in rows:
+            self.replace_tag_hash(int(row["image_file_id"]))
+        self._connection.commit()
+        return len(rows)
+
+    def ensure_tag_hashes_if_empty(self) -> int:
+        """tag_hashが空の場合だけ全件再構築し、再構築件数を返す。"""
+
+        if self.count_tag_hashes() > 0:
+            return 0
+        return self.rebuild_all_tag_hashes()
+
+    def find_duplicate_tag_sets(self, limit: int = 256) -> list[DuplicateTagSetItem]:
+        """重複しているタグ構成を画像件数の多い順で取得する。"""
+
+        rows = self._connection.execute(
+            """
+            SELECT
+                hash,
+                tag_set,
+                tag_names,
+                COUNT(*) AS image_count
+            FROM tag_hash
+            GROUP BY
+                hash,
+                tag_set,
+                tag_names
+            HAVING COUNT(*) >= 2
+            ORDER BY
+                image_count DESC,
+                tag_names ASC
+            LIMIT :limit
+            """,
+            {"limit": max(1, min(int(limit), 256))},
+        ).fetchall()
+        return [
+            DuplicateTagSetItem(
+                hash=str(row["hash"]),
+                tag_set=str(row["tag_set"]),
+                tag_names=str(row["tag_names"]),
+                image_count=int(row["image_count"]),
+            )
+            for row in rows
+        ]
+
+    def count_duplicate_tag_sets(self) -> int:
+        """重複タグ構成の総件数を返す。"""
+
+        return int(
+            self._connection.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM (
+                    SELECT
+                        hash,
+                        tag_set
+                    FROM tag_hash
+                    GROUP BY
+                        hash,
+                        tag_set
+                    HAVING COUNT(*) >= 2
+                ) duplicate_sets
+                """
+            ).fetchone()["count"]
+        )
 
     def _row_to_item(self, row) -> ImageFileListItem:
         """SQLite行データを一覧表示用DTOへ変換する。"""
@@ -592,6 +783,8 @@ class ImageFileRepository:
         is_favorite: bool | int | None,
         tags: list[str] | None,
         folder: str | None,
+        tag_hash: str | None,
+        tag_set: str | None,
     ) -> tuple[list[str], list[object]]:
         """画像検索のWHERE条件とパラメータを組み立てる。"""
 
@@ -618,6 +811,7 @@ class ImageFileRepository:
             params.append(folder)
 
         self._append_tag_conditions(where_clauses, params, tags)
+        self._append_tag_hash_condition(where_clauses, params, tag_hash, tag_set)
         return where_clauses, params
 
     def _append_tag_conditions(
@@ -650,6 +844,31 @@ class ImageFileRepository:
         params.extend(normalized_tags)
         params.append(len(normalized_tags))
 
+    def _append_tag_hash_condition(
+        self,
+        where_clauses: list[str],
+        params: list[object],
+        tag_hash: str | None,
+        tag_set: str | None,
+    ) -> None:
+        """タグ構成完全一致検索条件をWHERE句へ追加する。"""
+
+        if not tag_hash or not tag_set:
+            return
+
+        where_clauses.append(
+            """
+            id IN (
+                SELECT
+                    tag_hash.image_file_data_id
+                FROM tag_hash
+                WHERE tag_hash.hash = ?
+                  AND tag_hash.tag_set = ?
+            )
+            """
+        )
+        params.extend([tag_hash, tag_set])
+
     def _build_tag_search_params(self, keyword: str | None, limit: int) -> dict[str, object]:
         """タグ候補検索SQL用のパラメータを作る。"""
 
@@ -669,6 +888,11 @@ class ImageFileRepository:
             "keyword_like": f"%{normalized_keyword}%",
             "limit": max(1, min(int(limit), 256)),
         }
+
+    def _build_tag_hash_value(self, tag_set: str) -> str:
+        """tag_setから検索用MD5ハッシュを作る。"""
+
+        return hashlib.md5(tag_set.encode("utf-8")).hexdigest()
 
     def _normalize_true_condition(self, value: bool | int | None) -> bool:
         """検索条件値をtrue条件として評価する。"""

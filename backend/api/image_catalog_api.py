@@ -42,6 +42,7 @@ class ImageCatalogApi:
         """画像一覧検索およびページング取得を行う。"""
 
         data = payload if isinstance(payload, dict) else {}
+        tag_hash, tag_set = self._normalize_tag_hash_condition(data)
         result = self._get_repository().search(
             path=str(data.get("path", "") or ""),
             rating=self._normalize_nullable_string(data.get("rating")),
@@ -49,6 +50,8 @@ class ImageCatalogApi:
             is_favorite=data.get("is_favorite"),
             tags=self._normalize_search_tags(data.get("tags")),
             folder=self._normalize_search_folder(data.get("folder")),
+            tag_hash=tag_hash,
+            tag_set=tag_set,
             page=int(data.get("page", 1) or 1),
             page_size=int(data.get("page_size", 25) or 25),
             sort=str(data.get("sort", "id_desc") or "id_desc"),
@@ -315,6 +318,37 @@ class ImageCatalogApi:
             },
         ).to_dict()
 
+    def fetch_duplicate_tag_sets(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """重複しているタグ構成一覧を返す。"""
+
+        limit = 256
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            limit = self._normalize_tag_search_limit(data.get("limit"))
+            repository = self._get_repository()
+            items = repository.find_duplicate_tag_sets(limit)
+            total_count = repository.count_duplicate_tag_sets()
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="重複タグ構成一覧を取得できませんでした。",
+                data={
+                    "items": [],
+                    "totalCount": 0,
+                    "limit": limit,
+                },
+            ).to_dict()
+
+        return ApiResponse(
+            success=True,
+            message="",
+            data={
+                "items": [item.to_dict() for item in items],
+                "totalCount": total_count,
+                "limit": limit,
+            },
+        ).to_dict()
+
     def import_prompt_tags(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """タグ未登録画像へプロンプト由来タグを一括登録する。"""
 
@@ -383,6 +417,15 @@ class ImageCatalogApi:
 
         folder = str(value or "").strip()
         return folder or None
+
+    def _normalize_tag_hash_condition(self, data: dict[str, Any]) -> tuple[str | None, str | None]:
+        """タグ構成検索条件をhashとtag_setが揃う場合だけ有効化する。"""
+
+        tag_hash = str(data.get("tag_hash") or "").strip()
+        tag_set = str(data.get("tag_set") or "").strip()
+        if not tag_hash or not tag_set:
+            return None, None
+        return tag_hash, tag_set
 
     def _normalize_tag_search_limit(self, value: object) -> int:
         """タグ候補取得件数を1から256の範囲へ丸める。"""

@@ -1,10 +1,12 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import DuplicateTagSetModal from './components/form/DuplicateTagSetModal.vue'
 import LoadingOverlay from './components/common/LoadingOverlay.vue'
 import Content from './components/layout/Content.vue'
 import MainLayout from './components/layout/MainLayout.vue'
 import ImageDetailModal from './components/tile/ImageDetailModal.vue'
 import { useAppStatus } from './composables/useAppStatus'
+import { useDuplicateTagSetSearch } from './composables/useDuplicateTagSetSearch'
 import { useImageDetail } from './composables/useImageDetail'
 import { useImageMutations } from './composables/useImageMutations'
 import { usePromptTagImport } from './composables/usePromptTagImport'
@@ -31,6 +33,7 @@ const {
   handlePageChange,
   handlePageSizeChange,
   handleSortChange,
+  applyDuplicateTagSetCondition,
 } = useImageSearch({
   pushToast,
   setStatus,
@@ -66,6 +69,10 @@ const {
   pushToast,
   loading,
   refresh: executeSearch,
+})
+const duplicateTagSetSearch = useDuplicateTagSetSearch({
+  pushToast,
+  applyDuplicateTagSetCondition,
 })
 
 function clearSelection() {
@@ -167,6 +174,7 @@ onBeforeUnmount(() => {
     @import-prompt-tags="handleImportPromptTags"
     @delete-selected-images="handleDeleteSelectedImages"
     @move-selected-images="handleMoveSelectedImages"
+    @open-duplicate-tag-sets="duplicateTagSetSearch.openDuplicateTagSetModal"
   >
     <Content
       :search-result="searchResult"
@@ -187,6 +195,16 @@ onBeforeUnmount(() => {
     :is-loading-image="isLoadingImage"
     @close="handleCloseDetail"
     @open-folder="handleOpenContainingFolder"
+  />
+  <DuplicateTagSetModal
+    :show="duplicateTagSetSearch.duplicateTagSetModal.show"
+    :items="duplicateTagSetSearch.duplicateTagSetModal.items"
+    :total-count="duplicateTagSetSearch.duplicateTagSetModal.totalCount"
+    :limit="duplicateTagSetSearch.duplicateTagSetModal.limit"
+    :is-loading="duplicateTagSetSearch.duplicateTagSetModal.isLoading"
+    :message="duplicateTagSetSearch.duplicateTagSetModal.message"
+    @close="duplicateTagSetSearch.closeDuplicateTagSetModal"
+    @select="duplicateTagSetSearch.handleSelectDuplicateTagSet"
   />
   <LoadingOverlay
     :show="loading.loadingOverlay.show"

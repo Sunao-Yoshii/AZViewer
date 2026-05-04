@@ -1,4 +1,5 @@
 from .image_file import (
+    DuplicateTagSetItem,
     FileMoveFailure,
     FileMoveResult,
     FolderListItem,
@@ -14,6 +15,7 @@ from .image_file import (
 )
 
 __all__ = [
+    "DuplicateTagSetItem",
     "FileMoveFailure",
     "FileMoveResult",
     "FolderListItem",

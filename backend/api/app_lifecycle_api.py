@@ -51,10 +51,13 @@ class AppLifeCycleApi:
         startup_notification = None
         if not self._startup_cleanup_completed:
             try:
+                self._ensure_tag_hashes()
                 startup_notification = self._run_startup_cleanup()
                 self._ensure_thumbnail_cache()
-            finally:
-                self._startup_cleanup_completed = True
+            except Exception as exc:
+                LOGGER.exception("Application startup maintenance failed.")
+                return ApiResponse(success=False, message=str(exc), data=None).to_dict()
+            self._startup_cleanup_completed = True
 
         app_info = self._default_template_api.get_app_info()
         initialize_result = self._default_template_api.initialize_app()
@@ -106,6 +109,11 @@ class AppLifeCycleApi:
             "title": "ファイル状態確認が完了しました",
             "message": f"存在しないファイルの登録情報を {deleted_count} 件削除しました",
         }
+
+    def _ensure_tag_hashes(self) -> int:
+        """tag_hashが空の場合だけ既存タグリンクから再構築する。"""
+
+        return self._get_cleanup_repository().ensure_tag_hashes_if_empty()
 
     def _get_cleanup_service(self) -> StartupCleanupService:
         """起動時整合性確認サービスを取得し、未初期化の場合は初期化する。"""

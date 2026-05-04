@@ -18,6 +18,7 @@ defineEmits([
   'import-prompt-tags',
   'delete-selected-images',
   'move-selected-images',
+  'open-duplicate-tag-sets',
 ])
 </script>
 
@@ -49,6 +50,14 @@ defineEmits([
           @click="$emit('import-prompt-tags')"
         >
           プロンプトの読み取り
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          :disabled="isBusy"
+          @click="$emit('open-duplicate-tag-sets')"
+        >
+          重複タグ構成の検索
         </button>
         <span class="text-secondary small d-none d-sm-inline">
           {{ appInfo?.version ? `v${appInfo.version}` : 'Vue + pywebview' }}

@@ -301,6 +301,17 @@ body {
   font-size: 0.55rem;
 }
 
+.search-special-condition {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.search-special-condition-text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .search-folder-badge {
   max-width: 100%;
   white-space: normal;
@@ -345,6 +356,17 @@ body {
 
 .folder-search-item.is-selected .folder-search-count {
   color: #fff;
+}
+
+.duplicate-tag-set-list {
+  max-height: 65vh;
+  overflow: auto;
+}
+
+.duplicate-tag-set-names {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  text-align: left;
 }
 
 .image-detail-body {

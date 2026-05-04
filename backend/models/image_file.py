@@ -79,6 +79,26 @@ class FolderListItem:
 
 
 @dataclass(frozen=True)
+class DuplicateTagSetItem:
+    """重複しているタグ構成の1件分データを表す。"""
+
+    hash: str
+    tag_set: str
+    tag_names: str
+    image_count: int
+
+    def to_dict(self) -> dict[str, object]:
+        """API返却用の辞書形式へ変換する。"""
+
+        return {
+            "hash": self.hash,
+            "tagSet": self.tag_set,
+            "tagNames": self.tag_names,
+            "imageCount": self.image_count,
+        }
+
+
+@dataclass(frozen=True)
 class SearchImageFilesResult:
     """画像一覧検索結果を表す。"""
 

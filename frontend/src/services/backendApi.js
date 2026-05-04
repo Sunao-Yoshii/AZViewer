@@ -100,6 +100,10 @@ export async function fetchFoldersForSearch(payload = {}) {
   return await callBackendApi('fetch_folders_for_search', payload)
 }
 
+export async function fetchDuplicateTagSets(payload = {}) {
+  return await callBackendApi('fetch_duplicate_tag_sets', payload)
+}
+
 export async function importPromptTags() {
   return await callBackendApi('import_prompt_tags', {})
 }

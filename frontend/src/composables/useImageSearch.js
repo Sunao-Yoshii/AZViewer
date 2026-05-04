@@ -21,6 +21,9 @@ export function useImageSearch({ pushToast, setStatus, loading }) {
     is_favorite: false,
     tags: [],
     folder: null,
+    tagHash: null,
+    tagSet: null,
+    duplicateTagNames: null,
     page: 1,
     page_size: 25,
     sort: 'id_desc',
@@ -45,6 +48,8 @@ export function useImageSearch({ pushToast, setStatus, loading }) {
       is_favorite: merged.is_favorite ? 1 : null,
       tags: [...(merged.tags ?? [])].slice(0, 3),
       folder: merged.folder || null,
+      tag_hash: merged.tagHash || null,
+      tag_set: merged.tagSet || null,
       page: merged.page,
       page_size: merged.page_size,
       sort: merged.sort,
@@ -73,6 +78,9 @@ export function useImageSearch({ pushToast, setStatus, loading }) {
       is_favorite: appliedPayload.is_favorite === 1,
       tags: [...(appliedPayload.tags ?? [])].slice(0, 3),
       folder: appliedPayload.folder ?? null,
+      tagHash: appliedPayload.tag_hash ?? null,
+      tagSet: appliedPayload.tag_set ?? null,
+      duplicateTagNames: filters.value.duplicateTagNames ?? null,
       page: data.page ?? appliedPayload.page ?? 1,
       page_size: data.page_size ?? appliedPayload.page_size ?? 25,
       sort: appliedPayload.sort ?? 'id_desc',
@@ -83,6 +91,31 @@ export function useImageSearch({ pushToast, setStatus, loading }) {
       sort: appliedPayload.sort ?? 'id_desc',
     }
     currentSearchPayload.value = appliedPayload
+  }
+
+  function clearDuplicateTagSetCondition() {
+    filters.value = {
+      ...filters.value,
+      tagHash: null,
+      tagSet: null,
+      duplicateTagNames: null,
+    }
+  }
+
+  async function applyDuplicateTagSetCondition(item) {
+    filters.value = {
+      ...filters.value,
+      path: '',
+      rating: '',
+      is_checked: false,
+      is_favorite: false,
+      tags: [],
+      folder: null,
+      tagHash: item.hash,
+      tagSet: item.tagSet,
+      duplicateTagNames: item.tagNames,
+    }
+    return await executeSearch({ page: 1 }, true)
   }
 
   async function executeSearch(overrides = {}, overlay = false) {
@@ -134,6 +167,7 @@ export function useImageSearch({ pushToast, setStatus, loading }) {
   }
 
   async function handleSearch() {
+    clearDuplicateTagSetCondition()
     await executeSearch({ page: 1 }, true)
   }
 
@@ -166,5 +200,7 @@ export function useImageSearch({ pushToast, setStatus, loading }) {
     handlePageChange,
     handlePageSizeChange,
     handleSortChange,
+    applyDuplicateTagSetCondition,
+    clearDuplicateTagSetCondition,
   }
 }

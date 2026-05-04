@@ -50,6 +50,12 @@ function clearSearchFolder() {
   props.filters.folder = null
 }
 
+function clearDuplicateCondition() {
+  props.filters.tagHash = null
+  props.filters.tagSet = null
+  props.filters.duplicateTagNames = null
+}
+
 async function openTagSearchModal() {
   showTagSearchModal.value = true
   await handleSearchTags({ keyword: '' })
@@ -139,6 +145,22 @@ function applyFolderSearchFailure(message = 'フォルダ一覧を取得でき�
 
 <template>
   <div class="vstack gap-3">
+    <div v-if="filters.duplicateTagNames" class="alert alert-info py-2 px-2 small mb-0">
+      <div class="search-special-condition">
+        <span class="search-special-condition-text">
+          特殊条件: 重複タグ構成「{{ filters.duplicateTagNames }}」
+        </span>
+        <button
+          type="button"
+          class="btn btn-link btn-sm p-0"
+          :disabled="isBusy"
+          @click="clearDuplicateCondition"
+        >
+          解除
+        </button>
+      </div>
+    </div>
+
     <div>
       <label class="form-label small fw-semibold" for="searchPath">Path</label>
       <input

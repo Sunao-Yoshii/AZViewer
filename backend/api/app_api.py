@@ -134,6 +134,11 @@ class AppApi:
 
         return self._image_catalog_api.fetch_folders_for_search(payload)
 
+    def fetch_duplicate_tag_sets(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """重複タグ構成一覧を返す。"""
+
+        return self._image_catalog_api.fetch_duplicate_tag_sets(payload)
+
     def import_prompt_tags(self, payload: dict[str, object] | None = None) -> dict[str, object]:
         """タグ未登録画像へプロンプト由来タグを一括登録する。"""
 
