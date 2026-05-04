@@ -190,6 +190,32 @@ class ImageFileRepository:
         ).fetchall()
         return self._attach_tags([self._row_to_item(row) for row in rows])
 
+    def find_by_ids(self, record_ids: list[int]) -> list[ImageFileListItem]:
+        """指定ID群に一致する画像ファイル情報を取得する。"""
+
+        if not record_ids:
+            return []
+
+        placeholders = ", ".join("?" for _ in record_ids)
+        rows = self._connection.execute(
+            f"""
+            SELECT
+                id,
+                filename,
+                path,
+                folder,
+                rating,
+                is_checked,
+                is_favorite,
+                comment
+            FROM image_file_data
+            WHERE id IN ({placeholders})
+            ORDER BY id ASC
+            """,
+            record_ids,
+        ).fetchall()
+        return self._attach_tags([self._row_to_item(row) for row in rows])
+
     def find_ids_by_paths(self, paths: list[str]) -> list[int]:
         """指定パス群に一致するレコードID一覧を取得する。"""
 
@@ -357,6 +383,20 @@ class ImageFileRepository:
         )
         self._connection.commit()
         return cursor.rowcount > 0
+
+    def delete_by_ids(self, record_ids: list[int]) -> int:
+        """指定ID群に一致する画像ファイル情報を削除し、削除件数を返す。"""
+
+        if not record_ids:
+            return 0
+
+        placeholders = ", ".join("?" for _ in record_ids)
+        cursor = self._connection.execute(
+            f"DELETE FROM image_file_data WHERE id IN ({placeholders})",
+            record_ids,
+        )
+        self._connection.commit()
+        return cursor.rowcount
 
     def update_detail(
         self,

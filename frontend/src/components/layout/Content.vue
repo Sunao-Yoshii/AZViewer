@@ -11,6 +11,10 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  selectedImageIds: {
+    type: Array,
+    default: () => [],
+  },
 })
 
 defineEmits([
@@ -20,6 +24,7 @@ defineEmits([
   'open-detail',
   'request-delete',
   'save-detail',
+  'selection-change',
 ])
 
 const sortOptions = [
@@ -80,9 +85,11 @@ const pageSizeOptions = [25, 50, 75, 100]
         :key="item.id"
         :item="item"
         :is-searching="isSearching"
+        :selected="selectedImageIds.includes(item.id)"
         @open-detail="$emit('open-detail', $event)"
         @request-delete="$emit('request-delete', $event)"
         @save-detail="$emit('save-detail', $event)"
+        @selection-change="$emit('selection-change', $event)"
       />
     </div>
 

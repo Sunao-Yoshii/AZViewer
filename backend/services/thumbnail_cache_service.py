@@ -44,20 +44,28 @@ class ThumbnailCacheService:
             normalized.thumbnail((THUMBNAIL_SIZE, THUMBNAIL_SIZE), Image.Resampling.LANCZOS)
             normalized.save(thumb_path, format="PNG")
 
-    def delete_thumbnails(self, record_ids: list[int]) -> None:
-        """指定ID群に対応するサムネイルを削除する。"""
+    def delete_thumbnails(self, record_ids: list[int]) -> int:
+        """指定ID群に対応するサムネイルを削除し、削除件数を返す。"""
 
+        deleted_count = 0
         for record_id in record_ids:
-            self.delete_thumbnail(record_id)
+            if self.delete_thumbnail(record_id):
+                deleted_count += 1
+        return deleted_count
 
-    def delete_thumbnail(self, record_id: int) -> None:
-        """指定IDに対応するサムネイルを削除する。"""
+    def delete_thumbnail(self, record_id: int) -> bool:
+        """指定IDに対応するサムネイルを削除し、削除できたか返す。"""
 
         thumb_path = self.get_thumb_path(record_id)
+        if not thumb_path.exists():
+            return False
+
         try:
-            thumb_path.unlink(missing_ok=True)
+            thumb_path.unlink()
+            return True
         except OSError:
             LOGGER.exception("Failed to delete thumbnail cache: %s", thumb_path)
+            return False
 
     def get_thumbnail_bytes(self, record_id: int) -> bytes | None:
         """指定IDのサムネイルファイルを読み込む。"""

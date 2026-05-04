@@ -15,9 +15,13 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  selected: {
+    type: Boolean,
+    default: false,
+  },
 })
 
-const emit = defineEmits(['open-detail', 'request-delete', 'save-detail'])
+const emit = defineEmits(['open-detail', 'request-delete', 'save-detail', 'selection-change'])
 
 const isEditing = ref(false)
 const editRef = ref(null)
@@ -71,7 +75,19 @@ function applyMetadataTextToTagInput(value) {
         @click="$emit('open-detail', item)"
       />
       <div class="card-body image-tile-body">
-        <div class="small fw-semibold text-truncate" :title="item.filename">{{ item.filename }}</div>
+        <div class="image-tile-title-row small fw-semibold">
+          <input
+            type="checkbox"
+            class="form-check-input image-tile-select-checkbox"
+            :checked="selected"
+            :disabled="isSearching"
+            aria-label="削除対象として選択"
+            @change="$emit('selection-change', { id: item.id, selected: $event.target.checked })"
+          />
+          <span class="image-tile-title text-truncate" :title="item.filename">
+            {{ item.filename }}
+          </span>
+        </div>
         <div class="image-tile-folder small text-secondary text-truncate" :title="item.folder">
           {{ item.folder }}
         </div>

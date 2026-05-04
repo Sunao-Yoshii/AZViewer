@@ -199,6 +199,23 @@ body {
   min-height: 1.25rem;
 }
 
+.image-tile-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.image-tile-select-checkbox {
+  flex: 0 0 auto;
+  cursor: pointer;
+}
+
+.image-tile-title {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .image-tile-comment {
   min-height: 20px;
   overflow-y: auto;

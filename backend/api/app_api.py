@@ -99,6 +99,11 @@ class AppApi:
 
         return self._image_catalog_api.delete_image_file(payload)
 
+    def delete_image_files_with_physical_files(self, payload: dict[str, object]) -> dict[str, object]:
+        """指定レコードの実ファイルを含めて一括削除する。"""
+
+        return self._image_catalog_api.delete_image_files_with_physical_files(payload)
+
     def fetchLocalImage(self, payload: dict[str, object]) -> dict[str, object]:
         """ローカル画像の本体を表示用データURLとして返す。"""
 

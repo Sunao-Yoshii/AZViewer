@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from backend.repositories import ImageFileRepository
-from backend.models import PromptTagImportResult
+from backend.models import PhysicalDeleteFailure, PhysicalDeleteResult, PromptTagImportResult
 from backend.services import ImageMetadataService, PromptTagImportService, TagNormalizeService, ThumbnailCacheService
 
 from .api_response import ApiResponse
@@ -92,6 +92,42 @@ class ImageCatalogApi:
             message="Image file deleted.",
             data={"id": record_id},
         ).to_dict()
+
+    def delete_image_files_with_physical_files(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定レコードの実ファイル、サムネイル、DBレコードを一括削除する。"""
+
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            record_ids = self._normalize_delete_ids(data.get("ids"))
+            if not record_ids:
+                return ApiResponse(
+                    success=False,
+                    message="削除対象が指定されていません。",
+                    data=self._empty_physical_delete_data(),
+                ).to_dict()
+
+            repository = self._get_repository()
+            items = repository.find_by_ids(record_ids)
+            if not items:
+                return ApiResponse(
+                    success=True,
+                    message="削除対象の画像はありませんでした。",
+                    data=self._empty_physical_delete_data(),
+                ).to_dict()
+
+            result = self._delete_physical_files_and_records(repository, items)
+            message = (
+                "一部画像の削除に失敗しました。"
+                if result.failed_count > 0
+                else "選択画像の削除が完了しました。"
+            )
+            return ApiResponse(success=True, message=message, data=result.to_api_data()).to_dict()
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="選択画像の削除に失敗しました。",
+                data=self._empty_physical_delete_data(),
+            ).to_dict()
 
     def fetchLocalImage(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """ローカル画像の本体を表示用データURLとして返す。"""
@@ -321,6 +357,106 @@ class ImageCatalogApi:
             "is_favorite": int(data.get("is_favorite")),
             "comment": self._normalize_detail_comment(data.get("comment")),
         }
+
+    def _normalize_delete_ids(self, value: object) -> list[int]:
+        """一括削除対象IDを正の整数の重複なしリストへ正規化する。"""
+
+        if not isinstance(value, list):
+            return []
+
+        record_ids: list[int] = []
+        for item in value:
+            try:
+                record_id = int(item)
+            except (TypeError, ValueError):
+                continue
+
+            if record_id <= 0 or record_id in record_ids:
+                continue
+            record_ids.append(record_id)
+        return record_ids
+
+    def _empty_physical_delete_data(self) -> dict[str, object]:
+        """一括物理削除API用の空結果データを返す。"""
+
+        return PhysicalDeleteResult(
+            target_count=0,
+            deleted_file_count=0,
+            deleted_thumbnail_count=0,
+            deleted_record_count=0,
+            missing_file_count=0,
+            failed_count=0,
+            failed_files=[],
+        ).to_api_data()
+
+    def _delete_physical_files_and_records(
+        self,
+        repository: ImageFileRepository,
+        items: list,
+    ) -> PhysicalDeleteResult:
+        """実ファイル削除に成功した画像だけサムネイルとDBレコードを削除する。"""
+
+        delete_plan = self._delete_physical_files(items)
+        deletable_ids = delete_plan["deletable_ids"]
+        if deletable_ids:
+            deleted_thumbnail_count = self._thumbnail_cache_service.delete_thumbnails(deletable_ids)
+            deleted_record_count = repository.delete_by_ids(deletable_ids)
+        else:
+            deleted_thumbnail_count = 0
+            deleted_record_count = 0
+
+        return PhysicalDeleteResult(
+            target_count=len(items),
+            deleted_file_count=delete_plan["deleted_file_count"],
+            deleted_thumbnail_count=deleted_thumbnail_count,
+            deleted_record_count=deleted_record_count,
+            missing_file_count=delete_plan["missing_file_count"],
+            failed_count=len(items) - len(deletable_ids),
+            failed_files=delete_plan["failed_files"],
+        )
+
+    def _delete_physical_files(self, items: list) -> dict[str, Any]:
+        """画像ファイルを削除し、DB削除へ進めるIDと失敗情報を返す。"""
+
+        deletable_ids: list[int] = []
+        failed_files: list[PhysicalDeleteFailure] = []
+        deleted_file_count = 0
+        missing_file_count = 0
+
+        for item in items:
+            try:
+                file_deleted, file_missing = self._delete_physical_file(item.path)
+                deleted_file_count += 1 if file_deleted else 0
+                missing_file_count += 1 if file_missing else 0
+                deletable_ids.append(item.id)
+            except Exception:
+                if len(failed_files) < 20:
+                    failed_files.append(
+                        PhysicalDeleteFailure(
+                            id=item.id,
+                            path=item.path,
+                            reason="ファイルを削除できませんでした。",
+                        )
+                    )
+
+        return {
+            "deletable_ids": deletable_ids,
+            "deleted_file_count": deleted_file_count,
+            "missing_file_count": missing_file_count,
+            "failed_files": failed_files,
+        }
+
+    def _delete_physical_file(self, path: str) -> tuple[bool, bool]:
+        """1つの実ファイルを削除し、削除済みか不存在かを返す。"""
+
+        image_path = Path(path)
+        if not image_path.exists():
+            return False, True
+        if not image_path.is_file():
+            raise ValueError("画像ファイルではありません。")
+
+        image_path.unlink()
+        return True, False
 
     def _update_detail_with_tags(self, detail: dict[str, Any], tags: list[str]) -> bool:
         """詳細項目とタグリンクを同一トランザクションで更新する。"""

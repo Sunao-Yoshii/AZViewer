@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import LoadingOverlay from './components/common/LoadingOverlay.vue'
 import Content from './components/layout/Content.vue'
 import MainLayout from './components/layout/MainLayout.vue'
@@ -15,6 +15,9 @@ import { useToast } from './composables/useToast'
 const { status, setStatus } = useAppStatus()
 const { toasts, pushToast } = useToast()
 const loading = useLoadingOverlay()
+const selectedImageIdSet = ref(new Set())
+const selectedImageIds = computed(() => [...selectedImageIdSet.value])
+const selectedCount = computed(() => selectedImageIds.value.length)
 
 const {
   appInfo,
@@ -46,12 +49,14 @@ const {
   loading,
 })
 const {
+  deleteSelectedImages,
   handleDelete,
   handleSaveDetail,
 } = useImageMutations({
   pushToast,
   setStatus,
   refresh: executeSearch,
+  loading,
 })
 const {
   isImporting: isImportingPromptTags,
@@ -61,6 +66,53 @@ const {
   loading,
   refresh: executeSearch,
 })
+
+function clearSelection() {
+  selectedImageIdSet.value = new Set()
+}
+
+function handleSelectionChange({ id, selected }) {
+  const next = new Set(selectedImageIdSet.value)
+  if (selected) {
+    next.add(id)
+  } else {
+    next.delete(id)
+  }
+  selectedImageIdSet.value = next
+}
+
+async function handleSearchWithSelectionClear() {
+  clearSelection()
+  await handleSearch()
+}
+
+async function handleImportCompleteWithSelectionClear() {
+  clearSelection()
+  await handleImportComplete()
+}
+
+async function handlePageChangeWithSelectionClear(page) {
+  clearSelection()
+  await handlePageChange(page)
+}
+
+async function handlePageSizeChangeWithSelectionClear(pageSize) {
+  clearSelection()
+  await handlePageSizeChange(pageSize)
+}
+
+async function handleSortChangeWithSelectionClear(sort) {
+  clearSelection()
+  await handleSortChange(sort)
+}
+
+async function handleDeleteSelectedImages() {
+  await deleteSelectedImages({
+    ids: selectedImageIds.value,
+    refresh: executeSearch,
+    clearSelection,
+  })
+}
 
 function handleImportStartedEvent() {
   loading.showLoading('登録中', 'ドロップされた画像ファイルを登録しています。しばらくお待ちください。')
@@ -78,7 +130,7 @@ function handleImportedEvent(event) {
     return
   }
 
-  handleImportComplete()
+  handleImportCompleteWithSelectionClear()
 }
 
 onMounted(() => {
@@ -99,19 +151,24 @@ onBeforeUnmount(() => {
     :filters="filters"
     :status="status"
     :is-searching="isSearching || isImportingPromptTags"
-    @search="handleSearch"
-    @import-complete="handleImportComplete"
+    :selected-count="selectedCount"
+    :selected-image-ids="selectedImageIds"
+    @search="handleSearchWithSelectionClear"
+    @import-complete="handleImportCompleteWithSelectionClear"
     @import-prompt-tags="handleImportPromptTags"
+    @delete-selected-images="handleDeleteSelectedImages"
   >
     <Content
       :search-result="searchResult"
       :is-searching="isSearching"
-      @change-page="handlePageChange"
-      @change-page-size="handlePageSizeChange"
-      @change-sort="handleSortChange"
+      :selected-image-ids="selectedImageIds"
+      @change-page="handlePageChangeWithSelectionClear"
+      @change-page-size="handlePageSizeChangeWithSelectionClear"
+      @change-sort="handleSortChangeWithSelectionClear"
       @open-detail="handleOpenDetail"
       @request-delete="handleDelete"
       @save-detail="handleSaveDetail"
+      @selection-change="handleSelectionChange"
     />
   </MainLayout>
   <ImageDetailModal

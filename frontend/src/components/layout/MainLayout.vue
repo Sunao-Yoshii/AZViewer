@@ -20,9 +20,29 @@ defineProps({
     type: Boolean,
     default: false,
   },
+  selectedCount: {
+    type: Number,
+    default: 0,
+  },
+  selectedImageIds: {
+    type: Array,
+    default: () => [],
+  },
 })
 
-defineEmits(['search', 'import-complete', 'import-prompt-tags'])
+defineEmits([
+  'search',
+  'import-complete',
+  'import-prompt-tags',
+  'delete-selected-images',
+  'selection-change',
+  'change-page',
+  'change-page-size',
+  'change-sort',
+  'open-detail',
+  'request-delete',
+  'save-detail',
+])
 </script>
 
 <template>
@@ -30,7 +50,9 @@ defineEmits(['search', 'import-complete', 'import-prompt-tags'])
     <AppHeader
       :app-info="appInfo"
       :is-busy="isSearching"
+      :selected-count="selectedCount"
       @import-prompt-tags="$emit('import-prompt-tags')"
+      @delete-selected-images="$emit('delete-selected-images')"
     />
 
     <div class="app-body d-flex">
