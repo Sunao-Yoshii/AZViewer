@@ -32,6 +32,7 @@ AZViewer/
       file_scan_service.py
       image_file_import_service.py
       image_metadata_service.py
+      prompt_tag_import_service.py
       startup_cleanup_service.py
       tag_normalize_service.py
       thumbnail_cache_service.py
@@ -53,8 +54,8 @@ AZViewer/
           pagination.vue
         form/
           FolderSearchModal.vue
-          TagSearchModal.vue
           search_form.vue
+          TagSearchModal.vue
         layout/
           AppFooter.vue
           AppHeader.vue
@@ -62,10 +63,10 @@ AZViewer/
           Content.vue
           MainLayout.vue
         tile/
-          ImageDetailModal.vue
-          ImageMetadataModal.vue
           display.vue
           edit.vue
+          ImageDetailModal.vue
+          ImageMetadataModal.vue
           tile.vue
         upload/
           ErrorModal.vue
@@ -78,6 +79,7 @@ AZViewer/
         useImageMutations.js
         useImageSearch.js
         useLoadingOverlay.js
+        usePromptTagImport.js
         useToast.js
       main.js
       services/
