@@ -25,11 +25,11 @@ class DefaultTemplateApi:
 
         return ApiResponse(
             success=True,
-            message="Application information loaded.",
+            message="StableDiffusion WebUI 特化画像ビューワー.",
             data={
                 "name": "AZViewer",
-                "version": "0.3.0",
-                "description": "pywebview + Vue + Bootstrap application foundation.",
+                "version": "0.5.0",
+                "description": "StableDiffusion WebUI 特化画像ビューワー.",
             },
         ).to_dict()
 

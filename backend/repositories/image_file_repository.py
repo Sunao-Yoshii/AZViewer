@@ -8,6 +8,7 @@ from sqlite3 import Connection
 from backend.models import (
     DuplicateTagSetItem,
     FolderListItem,
+    ImageModelListItem,
     ImageFileListItem,
     ImageFileRecord,
     SearchImageFilesResult,
@@ -65,6 +66,7 @@ class ImageFileRepository:
             """
         )
         self._create_tag_hash_table()
+        self._create_image_model_tables()
         self._connection.commit()
 
     def _create_tag_hash_table(self) -> None:
@@ -96,6 +98,47 @@ class ImageFileRepository:
             """
         )
 
+    def _create_image_model_tables(self) -> None:
+        """生成元モデル管理用テーブルとインデックスを作成する。"""
+
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS image_model (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                CHECK (length(name) <= 512)
+            )
+            """
+        )
+        self._connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS image_model_to_file_data (
+                image_file_data_id INTEGER NOT NULL,
+                image_model_id INTEGER NOT NULL,
+                PRIMARY KEY (image_file_data_id, image_model_id),
+                UNIQUE (image_file_data_id),
+                FOREIGN KEY (image_file_data_id)
+                    REFERENCES image_file_data(id)
+                    ON DELETE CASCADE,
+                FOREIGN KEY (image_model_id)
+                    REFERENCES image_model(id)
+                    ON DELETE CASCADE
+            )
+            """
+        )
+        self._connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_image_model_name
+            ON image_model(name)
+            """
+        )
+        self._connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_image_model_to_file_data_model_id
+            ON image_model_to_file_data(image_model_id)
+            """
+        )
+
     def find_all_paths(self) -> list[str]:
         """登録済み画像ファイルのパス一覧を取得する。"""
 
@@ -120,7 +163,7 @@ class ImageFileRepository:
             ORDER BY id DESC
             """
         ).fetchall()
-        return self._attach_tags([self._row_to_item(row) for row in rows])
+        return self._attach_related_data([self._row_to_item(row) for row in rows])
 
     def find_items_without_tags(self) -> list[ImageFileListItem]:
         """タグが1件も紐づいていない画像ファイル情報を取得する。"""
@@ -141,6 +184,31 @@ class ImageFileRepository:
                 SELECT 1
                 FROM tag_image_link tag_link
                 WHERE tag_link.image_file_id = image_file.id
+            )
+            ORDER BY image_file.id ASC
+            """
+        ).fetchall()
+        return [self._row_to_item(row) for row in rows]
+
+    def find_items_without_model(self) -> list[ImageFileListItem]:
+        """生成元モデルが紐づいていない画像ファイル情報を取得する。"""
+
+        rows = self._connection.execute(
+            """
+            SELECT
+                id,
+                filename,
+                path,
+                folder,
+                rating,
+                is_checked,
+                is_favorite,
+                comment
+            FROM image_file_data image_file
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM image_model_to_file_data model_link
+                WHERE model_link.image_file_data_id = image_file.id
             )
             ORDER BY image_file.id ASC
             """
@@ -227,7 +295,7 @@ class ImageFileRepository:
             """,
             paths,
         ).fetchall()
-        return self._attach_tags([self._row_to_item(row) for row in rows])
+        return self._attach_related_data([self._row_to_item(row) for row in rows])
 
     def find_by_ids(self, record_ids: list[int]) -> list[ImageFileListItem]:
         """指定ID群に一致する画像ファイル情報を取得する。"""
@@ -253,7 +321,7 @@ class ImageFileRepository:
             """,
             record_ids,
         ).fetchall()
-        return self._attach_tags([self._row_to_item(row) for row in rows])
+        return self._attach_related_data([self._row_to_item(row) for row in rows])
 
     def find_ids_by_paths(self, paths: list[str]) -> list[int]:
         """指定パス群に一致するレコードID一覧を取得する。"""
@@ -277,6 +345,7 @@ class ImageFileRepository:
         is_favorite: bool | int | None = None,
         tags: list[str] | None = None,
         folder: str | None = None,
+        model: str | None = None,
         tag_hash: str | None = None,
         tag_set: str | None = None,
         page: int = 1,
@@ -294,6 +363,7 @@ class ImageFileRepository:
             is_favorite=is_favorite,
             tags=tags,
             folder=folder,
+            model=model,
             tag_hash=tag_hash,
             tag_set=tag_set,
         )
@@ -327,7 +397,7 @@ class ImageFileRepository:
         ).fetchall()
 
         items = [self._row_to_item(row) for row in rows]
-        items = self._attach_tags(items)
+        items = self._attach_related_data(items)
         return SearchImageFilesResult(
             items=items,
             total_count=total_count,
@@ -412,6 +482,51 @@ class ImageFileRepository:
                     WHERE (:keyword = '' OR folder LIKE :keyword_like)
                     GROUP BY folder
                 ) folders
+                """,
+                params,
+            ).fetchone()["count"]
+        )
+
+    def find_models_for_search(self, keyword: str | None = None, limit: int = 256) -> list[ImageModelListItem]:
+        """モデル検索候補を登録順相当で取得する。"""
+
+        params = self._build_model_search_params(keyword, limit)
+        rows = self._connection.execute(
+            """
+            SELECT
+                image_model.name AS name,
+                COUNT(model_link.image_file_data_id) AS image_count,
+                MIN(model_link.image_file_data_id) AS first_id
+            FROM image_model
+            INNER JOIN image_model_to_file_data model_link
+                ON model_link.image_model_id = image_model.id
+            WHERE (:keyword = '' OR image_model.name LIKE :keyword_like)
+            GROUP BY image_model.id, image_model.name
+            ORDER BY first_id ASC
+            LIMIT :limit
+            """,
+            params,
+        ).fetchall()
+        return [
+            ImageModelListItem(name=str(row["name"]), image_count=int(row["image_count"]))
+            for row in rows
+        ]
+
+    def count_models_for_search(self, keyword: str | None = None) -> int:
+        """モデル検索候補の条件一致総数を取得する。"""
+
+        params = self._build_model_search_params(keyword, 1)
+        return int(
+            self._connection.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM image_model
+                WHERE (:keyword = '' OR name LIKE :keyword_like)
+                  AND EXISTS (
+                    SELECT 1
+                    FROM image_model_to_file_data model_link
+                    WHERE model_link.image_model_id = image_model.id
+                  )
                 """,
                 params,
             ).fetchone()["count"]
@@ -575,7 +690,56 @@ class ImageFileRepository:
         if row is None:
             return None
         item = self._row_to_item(row)
-        return self._attach_tags([item])[0]
+        return self._attach_related_data([item])[0]
+
+    def find_or_create_image_model_id(self, name: str) -> int:
+        """モデル名に対応するIDを取得し、未登録の場合は作成する。"""
+
+        self._connection.execute(
+            "INSERT OR IGNORE INTO image_model (name) VALUES (?)",
+            (name,),
+        )
+        row = self._connection.execute(
+            "SELECT id FROM image_model WHERE name = ? LIMIT 1",
+            (name,),
+        ).fetchone()
+        if row is None:
+            raise RuntimeError(f"Image model could not be created: {name}")
+        return int(row["id"])
+
+    def replace_image_model(self, image_file_data_id: int, model_name: str | None) -> None:
+        """指定画像に紐づく生成元モデルリンクを置換する。"""
+
+        self._connection.execute(
+            "DELETE FROM image_model_to_file_data WHERE image_file_data_id = ?",
+            (image_file_data_id,),
+        )
+        normalized_name = str(model_name or "").strip()
+        if not normalized_name:
+            return
+
+        model_id = self.find_or_create_image_model_id(normalized_name)
+        self._connection.execute(
+            """
+            INSERT INTO image_model_to_file_data (
+                image_file_data_id,
+                image_model_id
+            )
+            VALUES (?, ?)
+            """,
+            (image_file_data_id, model_id),
+        )
+
+    def replace_image_model_atomic(self, image_file_data_id: int, model_name: str | None) -> None:
+        """指定画像のモデルリンク置換を1トランザクションで完結させる。"""
+
+        try:
+            self._connection.execute("BEGIN")
+            self.replace_image_model(image_file_data_id, model_name)
+            self._connection.commit()
+        except Exception:
+            self._connection.rollback()
+            raise
 
     def replace_tag_hash(self, image_file_id: int) -> None:
         """指定画像の現在のタグ構成からtag_hashを更新する。"""
@@ -746,6 +910,40 @@ class ImageFileRepository:
             for item in items
         ]
 
+    def _attach_related_data(self, items: list[ImageFileListItem]) -> list[ImageFileListItem]:
+        """一覧項目群へタグとモデル名をまとめて付与する。"""
+
+        return self._attach_model_names(self._attach_tags(items))
+
+    def _attach_model_names(self, items: list[ImageFileListItem]) -> list[ImageFileListItem]:
+        """一覧項目群へ生成元モデル名をまとめて付与する。"""
+
+        if not items:
+            return items
+
+        image_ids = [item.id for item in items]
+        placeholders = ", ".join("?" for _ in image_ids)
+        rows = self._connection.execute(
+            f"""
+            SELECT
+                model_link.image_file_data_id,
+                image_model.name
+            FROM image_model_to_file_data model_link
+            INNER JOIN image_model
+                ON image_model.id = model_link.image_model_id
+            WHERE model_link.image_file_data_id IN ({placeholders})
+            """,
+            image_ids,
+        ).fetchall()
+        models_by_image_id = {
+            int(row["image_file_data_id"]): str(row["name"])
+            for row in rows
+        }
+        return [
+            replace(item, model_name=models_by_image_id.get(item.id))
+            for item in items
+        ]
+
     def _find_or_create_tag_id(self, tag_name: str) -> int:
         """タグ名に対応するIDを取得し、未登録の場合は作成する。"""
 
@@ -783,6 +981,7 @@ class ImageFileRepository:
         is_favorite: bool | int | None,
         tags: list[str] | None,
         folder: str | None,
+        model: str | None,
         tag_hash: str | None,
         tag_set: str | None,
     ) -> tuple[list[str], list[object]]:
@@ -810,6 +1009,7 @@ class ImageFileRepository:
             where_clauses.append("folder = ?")
             params.append(folder)
 
+        self._append_model_condition(where_clauses, params, model)
         self._append_tag_conditions(where_clauses, params, tags)
         self._append_tag_hash_condition(where_clauses, params, tag_hash, tag_set)
         return where_clauses, params
@@ -869,6 +1069,31 @@ class ImageFileRepository:
         )
         params.extend([tag_hash, tag_set])
 
+    def _append_model_condition(
+        self,
+        where_clauses: list[str],
+        params: list[object],
+        model: str | None,
+    ) -> None:
+        """生成元モデル完全一致検索条件をWHERE句へ追加する。"""
+
+        if not model:
+            return
+
+        where_clauses.append(
+            """
+            id IN (
+                SELECT
+                    model_link.image_file_data_id
+                FROM image_model_to_file_data model_link
+                INNER JOIN image_model
+                    ON image_model.id = model_link.image_model_id
+                WHERE image_model.name = ?
+            )
+            """
+        )
+        params.append(model)
+
     def _build_tag_search_params(self, keyword: str | None, limit: int) -> dict[str, object]:
         """タグ候補検索SQL用のパラメータを作る。"""
 
@@ -881,6 +1106,16 @@ class ImageFileRepository:
 
     def _build_folder_search_params(self, keyword: str | None, limit: int) -> dict[str, object]:
         """フォルダ候補検索SQL用のパラメータを作る。"""
+
+        normalized_keyword = (keyword or "").strip()
+        return {
+            "keyword": normalized_keyword,
+            "keyword_like": f"%{normalized_keyword}%",
+            "limit": max(1, min(int(limit), 256)),
+        }
+
+    def _build_model_search_params(self, keyword: str | None, limit: int) -> dict[str, object]:
+        """モデル候補検索SQL用のパラメータを作る。"""
 
         normalized_keyword = (keyword or "").strip()
         return {

@@ -29,6 +29,7 @@ class ImageFileListItem:
     is_favorite: int
     comment: str | None = None
     tags: list[str] | None = None
+    model_name: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         """API返却用の辞書形式へ変換する。"""
@@ -43,6 +44,7 @@ class ImageFileListItem:
             "is_favorite": self.is_favorite,
             "comment": self.comment,
             "tags": self.tags or [],
+            "modelName": self.model_name,
         }
 
 
@@ -65,6 +67,22 @@ class TagListItem:
 @dataclass(frozen=True)
 class FolderListItem:
     """フォルダ検索候補の1件分データを表す。"""
+
+    name: str
+    image_count: int
+
+    def to_dict(self) -> dict[str, object]:
+        """API返却用の辞書形式へ変換する。"""
+
+        return {
+            "name": self.name,
+            "image_count": self.image_count,
+        }
+
+
+@dataclass(frozen=True)
+class ImageModelListItem:
+    """モデル検索候補の1件分データを表す。"""
 
     name: str
     image_count: int
@@ -148,6 +166,11 @@ class PromptTagImportResult:
     skipped_count: int
     failed_count: int
     failed_files: list[PromptTagImportFailure]
+    model_target_count: int = 0
+    model_processed_count: int = 0
+    model_linked_count: int = 0
+    model_skipped_count: int = 0
+    model_failed_count: int = 0
 
     def to_api_data(self) -> dict[str, object]:
         """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
@@ -158,6 +181,11 @@ class PromptTagImportResult:
             "taggedCount": self.tagged_count,
             "skippedCount": self.skipped_count,
             "failedCount": self.failed_count,
+            "modelTargetCount": self.model_target_count,
+            "modelProcessedCount": self.model_processed_count,
+            "modelLinkedCount": self.model_linked_count,
+            "modelSkippedCount": self.model_skipped_count,
+            "modelFailedCount": self.model_failed_count,
             "failedFiles": [
                 item.to_dict()
                 for item in self.failed_files[:20]
@@ -252,6 +280,26 @@ class FileMoveResult:
                 item.to_dict()
                 for item in self.failed_files[:20]
             ],
+        }
+
+
+@dataclass(frozen=True)
+class WildcardExportResult:
+    """ワイルドカードテキスト出力処理の結果を表す。"""
+
+    path: str
+    mode: str
+    line_count: int
+    cancelled: bool = False
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "path": self.path,
+            "mode": self.mode,
+            "lineCount": self.line_count,
+            "cancelled": self.cancelled,
         }
 
 

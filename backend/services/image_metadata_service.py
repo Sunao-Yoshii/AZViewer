@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -36,6 +37,7 @@ PROMPT_METADATA_KEYS_BY_EXTENSION = {
     ".webp": "exif.UserComment",
     ".avif": "exif.UserComment",
 }
+MODEL_NAME_PATTERN = re.compile(r"(?:^|[\n,]\s*)Model:\s*([^,\n]+)")
 
 
 class ImageMetadataService:
@@ -73,6 +75,28 @@ class ImageMetadataService:
 
         prompt = self._extract_positive_prompt(value).strip()
         return prompt or None
+
+    def extract_stable_diffusion_model_name(self, path: str) -> str | None:
+        """Stable Diffusion WebUIのModel名を画像メタ情報から抽出する。"""
+
+        image_path = Path(path)
+        if not image_path.exists():
+            raise FileNotFoundError(f"画像ファイルが存在しません: {path}")
+        if not image_path.is_file():
+            raise ValueError(f"画像ファイルではありません: {path}")
+
+        target_key = PROMPT_METADATA_KEYS_BY_EXTENSION.get(image_path.suffix.lower())
+        if target_key is None:
+            return None
+
+        with Image.open(image_path) as image:
+            lines = self._build_metadata_list(image_path, image)
+
+        value = self._extract_metadata_value(lines, target_key)
+        if value is None:
+            return None
+
+        return self._extract_model_name(value)
 
     def _build_metadata_list(self, image_path: Path, image: Image.Image) -> list:
         lines = [
@@ -198,6 +222,16 @@ class ImageMetadataService:
             return value[:steps_index]
 
         return value
+
+    def _extract_model_name(self, value: str) -> str | None:
+        """WebUIメタ情報本文から生成元モデル名を抽出する。"""
+
+        match = MODEL_NAME_PATTERN.search(value or "")
+        if not match:
+            return None
+
+        model_name = match.group(1).strip()
+        return model_name or None
 
     def _to_text(self, value: Any, *, key: str = "") -> str:
         if isinstance(value, bytes):

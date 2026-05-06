@@ -386,6 +386,25 @@ body {
   color: #fff;
 }
 
+.image-model-badge {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.model-search-badge-list,
+.model-select-badge-list {
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.model-search-item {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: left;
+}
+
 .duplicate-tag-set-list {
   max-height: 65vh;
   overflow: auto;
@@ -395,6 +414,30 @@ body {
   overflow-wrap: anywhere;
   word-break: break-word;
   text-align: left;
+}
+
+.wildcard-export-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-height: 24vh;
+  overflow: auto;
+}
+
+.wildcard-tag-toggle {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: left;
+}
+
+.wildcard-export-preview {
+  min-height: 30vh;
+  max-height: 45vh;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  white-space: pre;
+  overflow: auto;
 }
 
 .image-detail-body {

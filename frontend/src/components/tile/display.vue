@@ -51,6 +51,18 @@ const ratingBadgeClass = (rating) => {
     </span>
   </div>
 
+  <div class="mt-2 small text-muted">
+    Model:
+    <span
+      v-if="item.modelName"
+      class="badge text-bg-info image-model-badge"
+      :title="item.modelName"
+    >
+      {{ item.modelName }}
+    </span>
+    <span v-else>未設定</span>
+  </div>
+
   <div class="d-flex flex-wrap gap-2 mt-2">
     <button
       type="button"

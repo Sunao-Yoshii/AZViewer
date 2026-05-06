@@ -6,6 +6,7 @@ from .prompt_tag_import_service import PromptTagImportService
 from .startup_cleanup_service import StartupCleanupService
 from .tag_normalize_service import TagNormalizeService
 from .thumbnail_cache_service import ThumbnailCacheService
+from .wildcard_export_service import WildcardExportService
 
 __all__ = [
     "DialogService",
@@ -16,4 +17,5 @@ __all__ = [
     "StartupCleanupService",
     "TagNormalizeService",
     "ThumbnailCacheService",
+    "WildcardExportService",
 ]

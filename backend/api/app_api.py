@@ -3,6 +3,7 @@ from __future__ import annotations
 import webview
 
 from backend.services import ThumbnailCacheService
+from backend.services.dialog_service import DialogService
 
 from .app_lifecycle_api import AppLifeCycleApi
 from .database_lifecycle_manager import DatabaseLifecycleManager
@@ -22,7 +23,12 @@ class AppApi:
         default_template_api = DefaultTemplateApi()
         os_operation_api = OsOperationApi()
         thumbnail_cache_service = ThumbnailCacheService()
-        image_catalog_api = ImageCatalogApi(database_lifecycle_manager, thumbnail_cache_service)
+        dialog_service = DialogService(self._get_active_window)
+        image_catalog_api = ImageCatalogApi(
+            database_lifecycle_manager,
+            thumbnail_cache_service,
+            dialog_service=dialog_service,
+        )
 
         self._app_lifecycle_api = AppLifeCycleApi(
             database_lifecycle_manager,
@@ -35,7 +41,7 @@ class AppApi:
         self._os_operation_api = os_operation_api
         self._image_register_api = ImageRegisterApi(
             database_lifecycle_manager,
-            self._get_active_window,
+            dialog_service,
             thumbnail_cache_service,
         )
 
@@ -134,6 +140,11 @@ class AppApi:
 
         return self._image_catalog_api.fetch_folders_for_search(payload)
 
+    def fetch_models_for_search(self, payload: dict[str, object]) -> dict[str, object]:
+        """モデル検索候補を返す。"""
+
+        return self._image_catalog_api.fetch_models_for_search(payload)
+
     def fetch_duplicate_tag_sets(self, payload: dict[str, object] | None = None) -> dict[str, object]:
         """重複タグ構成一覧を返す。"""
 
@@ -143,6 +154,11 @@ class AppApi:
         """タグ未登録画像へプロンプト由来タグを一括登録する。"""
 
         return self._image_catalog_api.import_prompt_tags(payload)
+
+    def export_wildcard_text(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """ワイルドカード出力テキストを保存または追記する。"""
+
+        return self._image_catalog_api.export_wildcard_text(payload)
 
     def open_containing_folder(self, payload: dict[str, object]) -> dict[str, object]:
         """指定ファイルが存在するフォルダをエクスプローラで開く。"""

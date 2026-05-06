@@ -2,9 +2,11 @@
 import { reactive, ref } from 'vue'
 import {
   fetchFoldersForSearch,
+  fetchModelsForSearch,
   fetchTagsForSearch,
 } from '../../services/backendApi'
 import FolderSearchModal from './FolderSearchModal.vue'
+import ModelSearchModal from './ModelSearchModal.vue'
 import TagSearchModal from './TagSearchModal.vue'
 
 const props = defineProps({
@@ -21,6 +23,7 @@ const props = defineProps({
 const emit = defineEmits(['search'])
 const showTagSearchModal = ref(false)
 const showFolderSearchModal = ref(false)
+const showModelSearchModal = ref(false)
 const tagSearchState = reactive({
   items: [],
   totalCount: 0,
@@ -28,6 +31,12 @@ const tagSearchState = reactive({
   message: '',
 })
 const folderSearchState = reactive({
+  items: [],
+  totalCount: 0,
+  isLoading: false,
+  message: '',
+})
+const modelSearchState = reactive({
   items: [],
   totalCount: 0,
   isLoading: false,
@@ -48,6 +57,10 @@ function removeSearchTag(tag) {
 
 function clearSearchFolder() {
   props.filters.folder = null
+}
+
+function clearSearchModel() {
+  props.filters.model = null
 }
 
 function clearDuplicateCondition() {
@@ -82,6 +95,19 @@ function closeFolderSearchModal() {
 function applyFolder(folder) {
   props.filters.folder = folder || null
   showFolderSearchModal.value = false
+}
+
+function openModelSearchModal() {
+  showModelSearchModal.value = true
+}
+
+function closeModelSearchModal() {
+  showModelSearchModal.value = false
+}
+
+function applyModel(modelName) {
+  props.filters.model = modelName || null
+  showModelSearchModal.value = false
 }
 
 async function handleSearchTags({ keyword }) {
@@ -140,6 +166,35 @@ function applyFolderSearchFailure(message = 'フォルダ一覧を取得でき�
   folderSearchState.items = []
   folderSearchState.totalCount = 0
   folderSearchState.message = message || 'フォルダ一覧を取得できませんでした。'
+}
+
+async function handleSearchModels({ keyword }) {
+  modelSearchState.isLoading = true
+  modelSearchState.message = ''
+
+  try {
+    const result = await fetchModelsForSearch({
+      keyword: keyword ?? '',
+      limit: 256,
+    })
+    if (!result.success) {
+      applyModelSearchFailure(result.message)
+      return
+    }
+
+    modelSearchState.items = result.data?.models ?? []
+    modelSearchState.totalCount = result.data?.total_count ?? 0
+  } catch {
+    applyModelSearchFailure()
+  } finally {
+    modelSearchState.isLoading = false
+  }
+}
+
+function applyModelSearchFailure(message = 'モデル一覧を取得できませんでした。') {
+  modelSearchState.items = []
+  modelSearchState.totalCount = 0
+  modelSearchState.message = message || 'モデル一覧を取得できませんでした。'
 }
 </script>
 
@@ -270,6 +325,34 @@ function applyFolderSearchFailure(message = 'フォルダ一覧を取得でき�
       <div v-else class="small text-secondary">未指定</div>
     </div>
 
+    <div>
+      <div class="d-flex justify-content-between align-items-center mb-1">
+        <span class="form-label small fw-semibold mb-0">モデル</span>
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          :disabled="isBusy"
+          @click="openModelSearchModal"
+        >
+          モデル選択
+        </button>
+      </div>
+
+      <div v-if="filters.model" class="d-flex flex-wrap gap-1">
+        <span class="badge text-bg-info image-model-badge">
+          {{ filters.model }}
+          <button
+            type="button"
+            class="btn-close btn-close-white ms-1 search-badge-close"
+            aria-label="モデル検索条件を解除"
+            :disabled="isBusy"
+            @click="clearSearchModel"
+          ></button>
+        </span>
+      </div>
+      <div v-else class="small text-secondary">未指定</div>
+    </div>
+
     <button
       type="button"
       class="btn btn-primary btn-sm w-100"
@@ -301,6 +384,17 @@ function applyFolderSearchFailure(message = 'フォルダ一覧を取得でき�
       @close="closeFolderSearchModal"
       @apply="applyFolder"
       @search-folders="handleSearchFolders"
+    />
+    <ModelSearchModal
+      :show="showModelSearchModal"
+      :selected-model="filters.model"
+      :models="modelSearchState.items"
+      :total-count="modelSearchState.totalCount"
+      :is-loading="modelSearchState.isLoading"
+      :external-message="modelSearchState.message"
+      @close="closeModelSearchModal"
+      @apply="applyModel"
+      @search-models="handleSearchModels"
     />
   </div>
 </template>

@@ -2,15 +2,16 @@ import { ref } from 'vue'
 import { importPromptTags } from '../services/backendApi'
 
 const CONFIRM_MESSAGE = [
-  'タグ未登録の画像から Stable Diffusion WebUI のプロンプト情報を読み取り、タグとして登録します。',
-  '既にタグが登録されている画像は対象外です。',
+  '画像メタデータから Stable Diffusion WebUI のプロンプト情報とモデル情報を読み取ります。',
+  'タグは未登録画像のみ、モデルは未設定画像のみ対象です。',
   '実行しますか？',
 ].join('\n')
 
 function buildSuccessMessage(data) {
   return [
     'プロンプト情報の読み取りが完了しました。',
-    `対象: ${data.targetCount ?? 0} 件 / タグ登録: ${data.taggedCount ?? 0} 件 / スキップ: ${data.skippedCount ?? 0} 件 / 失敗: ${data.failedCount ?? 0} 件`,
+    `タグ対象: ${data.targetCount ?? 0} 件 / タグ登録: ${data.taggedCount ?? 0} 件 / タグスキップ: ${data.skippedCount ?? 0} 件 / タグ失敗: ${data.failedCount ?? 0} 件`,
+    `モデル対象: ${data.modelTargetCount ?? 0} 件 / モデル登録: ${data.modelLinkedCount ?? 0} 件 / モデルスキップ: ${data.modelSkippedCount ?? 0} 件 / モデル失敗: ${data.modelFailedCount ?? 0} 件`,
   ].join('\n')
 }
 
@@ -44,10 +45,10 @@ export function usePromptTagImport({ pushToast, loading, refresh }) {
         message: buildSuccessMessage(data),
       })
 
-      if ((data.failedCount ?? 0) > 0) {
+      if ((data.failedCount ?? 0) > 0 || (data.modelFailedCount ?? 0) > 0) {
         pushToast({
           type: 'warning',
-          message: `一部画像の処理に失敗しました。失敗件数: ${data.failedCount} 件`,
+          message: `一部画像の処理に失敗しました。タグ失敗: ${data.failedCount ?? 0} 件 / モデル失敗: ${data.modelFailedCount ?? 0} 件`,
         })
       }
 

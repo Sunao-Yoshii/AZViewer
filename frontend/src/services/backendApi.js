@@ -100,12 +100,20 @@ export async function fetchFoldersForSearch(payload = {}) {
   return await callBackendApi('fetch_folders_for_search', payload)
 }
 
+export async function fetchModelsForSearch(payload = {}) {
+  return await callBackendApi('fetch_models_for_search', payload)
+}
+
 export async function fetchDuplicateTagSets(payload = {}) {
   return await callBackendApi('fetch_duplicate_tag_sets', payload)
 }
 
 export async function importPromptTags() {
   return await callBackendApi('import_prompt_tags', {})
+}
+
+export async function exportWildcardText(payload) {
+  return await callBackendApi('export_wildcard_text', payload)
 }
 
 export async function openContainingFolder(path) {

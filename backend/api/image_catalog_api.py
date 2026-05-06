@@ -14,8 +14,16 @@ from backend.models import (
     PhysicalDeleteFailure,
     PhysicalDeleteResult,
     PromptTagImportResult,
+    WildcardExportResult,
 )
-from backend.services import ImageMetadataService, PromptTagImportService, TagNormalizeService, ThumbnailCacheService
+from backend.services import (
+    DialogService,
+    ImageMetadataService,
+    PromptTagImportService,
+    TagNormalizeService,
+    ThumbnailCacheService,
+    WildcardExportService,
+)
 
 from .api_response import ApiResponse
 from .database_lifecycle_manager import DatabaseLifecycleManager
@@ -29,14 +37,18 @@ class ImageCatalogApi:
         database_lifecycle_manager: DatabaseLifecycleManager,
         thumbnail_cache_service: ThumbnailCacheService,
         metadata_service: ImageMetadataService | None = None,
+        tag_normalize_service: TagNormalizeService | None = None,
+        dialog_service: DialogService | None = None,
     ) -> None:
         """利用するDB接続管理と一覧用リポジトリを保持する。"""
 
         self._database_lifecycle_manager = database_lifecycle_manager
         self._thumbnail_cache_service = thumbnail_cache_service
         self._metadata_service = metadata_service or ImageMetadataService()
-        self._tag_normalize_service = TagNormalizeService()
+        self._tag_normalize_service = tag_normalize_service or TagNormalizeService()
+        self._dialog_service = dialog_service
         self._repository: ImageFileRepository | None = None
+        self._wildcard_export_service: WildcardExportService | None = None
 
     def search_image_files(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """画像一覧検索およびページング取得を行う。"""
@@ -50,6 +62,7 @@ class ImageCatalogApi:
             is_favorite=data.get("is_favorite"),
             tags=self._normalize_search_tags(data.get("tags")),
             folder=self._normalize_search_folder(data.get("folder")),
+            model=self._normalize_search_model(data.get("model")),
             tag_hash=tag_hash,
             tag_set=tag_set,
             page=int(data.get("page", 1) or 1),
@@ -69,7 +82,8 @@ class ImageCatalogApi:
         try:
             detail = self._normalize_detail_payload(data)
             tags = self._tag_normalize_service.normalize_tags(data.get("tags"))
-            updated = self._update_detail_with_tags(detail, tags)
+            model_name = self._normalize_model_name(data.get("modelName"))
+            updated = self._update_detail_with_tags_and_model(detail, tags, model_name)
         except (TypeError, ValueError) as exc:
             return ApiResponse(success=False, message=str(exc), data=None).to_dict()
         except Exception as exc:
@@ -81,7 +95,7 @@ class ImageCatalogApi:
         return ApiResponse(
             success=True,
             message="Image file detail updated.",
-            data={**detail, "tags": tags},
+            data={**detail, "tags": tags, "modelName": model_name},
         ).to_dict()
 
     def delete_image_file(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -318,6 +332,38 @@ class ImageCatalogApi:
             },
         ).to_dict()
 
+    def fetch_models_for_search(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """モデル検索ダイアログに表示するモデル候補を返す。"""
+
+        limit = 256
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            keyword = str(data.get("keyword") or "").strip()
+            limit = self._normalize_model_search_limit(data.get("limit"))
+            repository = self._get_repository()
+            models = repository.find_models_for_search(keyword=keyword, limit=limit)
+            total_count = repository.count_models_for_search(keyword=keyword)
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="モデル一覧を取得できませんでした。",
+                data={
+                    "models": [],
+                    "total_count": 0,
+                    "limit": limit,
+                },
+            ).to_dict()
+
+        return ApiResponse(
+            success=True,
+            message="",
+            data={
+                "models": [model.to_dict() for model in models],
+                "total_count": total_count,
+                "limit": limit,
+            },
+        ).to_dict()
+
     def fetch_duplicate_tag_sets(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """重複しているタグ構成一覧を返す。"""
 
@@ -379,6 +425,40 @@ class ImageCatalogApi:
             data=result.to_api_data(),
         ).to_dict()
 
+    def export_wildcard_text(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """ワイルドカード出力テキストを保存または追記する。"""
+
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            mode = str(data.get("mode") or "").strip()
+            text = str(data.get("text") or "")
+            result = self._get_wildcard_export_service().export_text(mode=mode, text=text)
+
+            if result.cancelled:
+                return ApiResponse(
+                    success=False,
+                    message="保存がキャンセルされました。",
+                    data=result.to_api_data(),
+                ).to_dict()
+
+            return ApiResponse(
+                success=True,
+                message="ワイルドカードを出力しました。",
+                data=result.to_api_data(),
+            ).to_dict()
+        except ValueError as exc:
+            return ApiResponse(
+                success=False,
+                message=str(exc),
+                data=self._empty_wildcard_export_data(),
+            ).to_dict()
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="ワイルドカード出力に失敗しました。",
+                data=self._empty_wildcard_export_data(),
+            ).to_dict()
+
     def _get_repository(self) -> ImageFileRepository:
         """一覧系処理で利用するリポジトリを返す。"""
 
@@ -389,6 +469,17 @@ class ImageCatalogApi:
         self._repository = ImageFileRepository(connection)
         self._repository.create_table()
         return self._repository
+
+    def _get_wildcard_export_service(self) -> WildcardExportService:
+        """ワイルドカード出力サービスを返す。"""
+
+        if self._wildcard_export_service is not None:
+            return self._wildcard_export_service
+        if self._dialog_service is None:
+            raise ValueError("DialogService が初期化されていません。")
+
+        self._wildcard_export_service = WildcardExportService(self._dialog_service)
+        return self._wildcard_export_service
 
     def _normalize_nullable_string(self, value: object) -> str | None:
         """未指定文字列をNoneへ正規化する。"""
@@ -418,6 +509,12 @@ class ImageCatalogApi:
         folder = str(value or "").strip()
         return folder or None
 
+    def _normalize_search_model(self, value: object) -> str | None:
+        """検索条件用モデル名を空文字ならNoneへ正規化する。"""
+
+        model = str(value or "").strip()
+        return model or None
+
     def _normalize_tag_hash_condition(self, data: dict[str, Any]) -> tuple[str | None, str | None]:
         """タグ構成検索条件をhashとtag_setが揃う場合だけ有効化する。"""
 
@@ -436,6 +533,11 @@ class ImageCatalogApi:
             limit = 256
         return max(1, min(limit, 256))
 
+    def _normalize_model_search_limit(self, value: object) -> int:
+        """モデル候補取得件数を1から256の範囲へ丸める。"""
+
+        return self._normalize_tag_search_limit(value)
+
     def _normalize_detail_payload(self, data: dict[str, Any]) -> dict[str, Any]:
         """詳細更新ペイロードをリポジトリ用の値へ正規化する。"""
 
@@ -446,6 +548,16 @@ class ImageCatalogApi:
             "is_favorite": int(data.get("is_favorite")),
             "comment": self._normalize_detail_comment(data.get("comment")),
         }
+
+    def _normalize_model_name(self, value: object) -> str | None:
+        """詳細保存用モデル名を検証して正規化する。"""
+
+        model_name = str(value or "").strip()
+        if not model_name:
+            return None
+        if len(model_name) > 512:
+            raise ValueError("モデル名は512文字以内で入力してください。")
+        return model_name
 
     def _normalize_delete_ids(self, value: object) -> list[int]:
         """一括削除対象IDを正の整数の重複なしリストへ正規化する。"""
@@ -506,6 +618,16 @@ class ImageCatalogApi:
             skipped_count=0,
             failed_count=0,
             failed_files=[],
+        ).to_api_data()
+
+    def _empty_wildcard_export_data(self) -> dict[str, object]:
+        """ワイルドカード出力API用の空結果データを返す。"""
+
+        return WildcardExportResult(
+            path="",
+            mode="",
+            line_count=0,
+            cancelled=False,
         ).to_api_data()
 
     def _delete_physical_files_and_records(
@@ -747,8 +869,13 @@ class ImageCatalogApi:
             return str(error)
         return "ファイルを移動できませんでした。"
 
-    def _update_detail_with_tags(self, detail: dict[str, Any], tags: list[str]) -> bool:
-        """詳細項目とタグリンクを同一トランザクションで更新する。"""
+    def _update_detail_with_tags_and_model(
+        self,
+        detail: dict[str, Any],
+        tags: list[str],
+        model_name: str | None,
+    ) -> bool:
+        """詳細項目、タグリンク、モデルリンクを同一トランザクションで更新する。"""
 
         connection = self._database_lifecycle_manager.get_connection()
         repository = self._get_repository()
@@ -759,6 +886,7 @@ class ImageCatalogApi:
                 connection.rollback()
                 return False
             repository.replace_tags(int(detail["record_id"]), tags)
+            repository.replace_image_model(int(detail["record_id"]), model_name)
             connection.commit()
             return True
         except Exception:

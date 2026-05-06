@@ -18,6 +18,7 @@ defineEmits([
   'import-prompt-tags',
   'delete-selected-images',
   'move-selected-images',
+  'open-wildcard-export',
   'open-duplicate-tag-sets',
 ])
 </script>
@@ -27,6 +28,14 @@ defineEmits([
     <div class="container-fluid">
       <span class="navbar-brand mb-0 h1">{{ appInfo?.name ?? 'AZViewer' }}</span>
       <div class="app-header-actions">
+        <button
+          type="button"
+          class="btn btn-outline-success btn-sm"
+          :disabled="isBusy || selectedCount === 0"
+          @click="$emit('open-wildcard-export')"
+        >
+          ワイルドカード出力 ({{ selectedCount }})
+        </button>
         <button
           type="button"
           class="btn btn-success btn-sm"

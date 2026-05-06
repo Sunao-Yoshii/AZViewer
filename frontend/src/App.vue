@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import DuplicateTagSetModal from './components/form/DuplicateTagSetModal.vue'
+import WildcardExportModal from './components/form/WildcardExportModal.vue'
 import LoadingOverlay from './components/common/LoadingOverlay.vue'
 import Content from './components/layout/Content.vue'
 import MainLayout from './components/layout/MainLayout.vue'
@@ -13,6 +14,7 @@ import { usePromptTagImport } from './composables/usePromptTagImport'
 import { useImageSearch } from './composables/useImageSearch'
 import { useLoadingOverlay } from './composables/useLoadingOverlay'
 import { useToast } from './composables/useToast'
+import { useWildcardExport } from './composables/useWildcardExport'
 
 const { status, setStatus } = useAppStatus()
 const { toasts, pushToast } = useToast()
@@ -74,6 +76,10 @@ const duplicateTagSetSearch = useDuplicateTagSetSearch({
   pushToast,
   applyDuplicateTagSetCondition,
 })
+const wildcardExport = useWildcardExport({
+  pushToast,
+  clearSelection,
+})
 
 function clearSelection() {
   selectedImageIdSet.value = new Set()
@@ -130,6 +136,13 @@ async function handleMoveSelectedImages() {
   })
 }
 
+function handleOpenWildcardExport() {
+  wildcardExport.openWildcardExportModal({
+    ids: selectedImageIds.value,
+    currentItems: searchResult.value.items,
+  })
+}
+
 function handleImportStartedEvent() {
   loading.showLoading('登録中', 'ドロップされた画像ファイルを登録しています。しばらくお待ちください。')
 }
@@ -174,6 +187,7 @@ onBeforeUnmount(() => {
     @import-prompt-tags="handleImportPromptTags"
     @delete-selected-images="handleDeleteSelectedImages"
     @move-selected-images="handleMoveSelectedImages"
+    @open-wildcard-export="handleOpenWildcardExport"
     @open-duplicate-tag-sets="duplicateTagSetSearch.openDuplicateTagSetModal"
   >
     <Content
@@ -205,6 +219,19 @@ onBeforeUnmount(() => {
     :message="duplicateTagSetSearch.duplicateTagSetModal.message"
     @close="duplicateTagSetSearch.closeDuplicateTagSetModal"
     @select="duplicateTagSetSearch.handleSelectDuplicateTagSet"
+  />
+  <WildcardExportModal
+    :show="wildcardExport.wildcardExportModal.show"
+    :export-mode="wildcardExport.wildcardExportModal.exportMode"
+    :tag-items="wildcardExport.wildcardExportModal.tagItems"
+    :preview-text="wildcardExport.wildcardExportModal.previewText"
+    :selected-count="wildcardExport.wildcardExportModal.selectedIds.length"
+    :output-line-count="wildcardExport.wildcardExportModal.outputLineCount"
+    :is-saving="wildcardExport.wildcardExportModal.isSaving"
+    @close="wildcardExport.closeWildcardExportModal"
+    @change-mode="wildcardExport.changeWildcardExportMode"
+    @toggle-tag="wildcardExport.toggleWildcardExportTag"
+    @save="wildcardExport.saveWildcardExport"
   />
   <LoadingOverlay
     :show="loading.loadingOverlay.show"

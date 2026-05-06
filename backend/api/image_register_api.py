@@ -20,13 +20,13 @@ class ImageRegisterApi:
     def __init__(
         self,
         database_lifecycle_manager: DatabaseLifecycleManager,
-        window_provider,
+        dialog_service: DialogService,
         thumbnail_cache_service: ThumbnailCacheService,
     ) -> None:
         """利用するDB接続管理と画像登録系サービスを保持する。"""
 
         self._database_lifecycle_manager = database_lifecycle_manager
-        self._dialog_service = DialogService(window_provider)
+        self._dialog_service = dialog_service
         self._thumbnail_cache_service = thumbnail_cache_service
         self._repository: ImageFileRepository | None = None
         self._import_service: ImageFileImportService | None = None

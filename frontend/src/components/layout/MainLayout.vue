@@ -36,6 +36,7 @@ defineEmits([
   'import-prompt-tags',
   'delete-selected-images',
   'move-selected-images',
+  'open-wildcard-export',
   'open-duplicate-tag-sets',
   'selection-change',
   'change-page',
@@ -56,6 +57,7 @@ defineEmits([
       @import-prompt-tags="$emit('import-prompt-tags')"
       @delete-selected-images="$emit('delete-selected-images')"
       @move-selected-images="$emit('move-selected-images')"
+      @open-wildcard-export="$emit('open-wildcard-export')"
       @open-duplicate-tag-sets="$emit('open-duplicate-tag-sets')"
     />
 

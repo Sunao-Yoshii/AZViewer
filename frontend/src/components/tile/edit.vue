@@ -1,5 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { fetchModelsForSearch } from '../../services/backendApi'
+import ImageModelSelectModal from './ImageModelSelectModal.vue'
 
 const props = defineProps({
   item: {
@@ -15,6 +17,13 @@ const BRACKET_CHARS = new Set(['(', ')', '[', ']', '{', '}'])
 const MAX_TAG_NAME_LENGTH = 512
 const form = ref(createFormState(props.item))
 const tagError = ref('')
+const showModelSelectModal = ref(false)
+const modelSearchState = ref({
+  items: [],
+  totalCount: 0,
+  isLoading: false,
+  message: '',
+})
 
 const isDirty = computed(() => {
   return (
@@ -23,7 +32,8 @@ const isDirty = computed(() => {
     Number(form.value.is_favorite) !== props.item.is_favorite ||
     form.value.comment !== (props.item.comment ?? '') ||
     JSON.stringify(normalizeTagsForCompare(form.value.tags)) !==
-      JSON.stringify(normalizeTagsForCompare(props.item.tags))
+      JSON.stringify(normalizeTagsForCompare(props.item.tags)) ||
+    form.value.modelName !== (props.item.modelName ?? '')
   )
 })
 
@@ -42,6 +52,7 @@ function createFormState(item) {
     comment: item.comment ?? '',
     tags: [...(item.tags ?? [])],
     tagInput: '',
+    modelName: item.modelName ?? '',
   }
 }
 
@@ -53,6 +64,7 @@ function createSavePayload() {
     is_favorite: form.value.is_favorite ? 1 : 0,
     comment: form.value.comment,
     tags: form.value.tags,
+    modelName: form.value.modelName || null,
   }
 }
 
@@ -94,6 +106,56 @@ function addTagsFromInput() {
 
 function removeTag(tag) {
   form.value.tags = form.value.tags.filter((value) => value !== tag)
+}
+
+function clearModelName() {
+  form.value.modelName = ''
+}
+
+function applyModelName(modelName) {
+  form.value.modelName = (modelName || '').trim()
+  showModelSelectModal.value = false
+}
+
+function closeModelSelectModal() {
+  showModelSelectModal.value = false
+}
+
+async function handleSearchModels({ keyword }) {
+  modelSearchState.value = {
+    ...modelSearchState.value,
+    isLoading: true,
+    message: '',
+  }
+
+  try {
+    const result = await fetchModelsForSearch({
+      keyword: keyword ?? '',
+      limit: 256,
+    })
+    if (!result.success) {
+      applyModelSearchFailure(result.message)
+      return
+    }
+
+    modelSearchState.value = {
+      items: result.data?.models ?? [],
+      totalCount: result.data?.total_count ?? 0,
+      isLoading: false,
+      message: '',
+    }
+  } catch {
+    applyModelSearchFailure()
+  }
+}
+
+function applyModelSearchFailure(message = 'モデル一覧を取得できませんでした。') {
+  modelSearchState.value = {
+    items: [],
+    totalCount: 0,
+    isLoading: false,
+    message: message || 'モデル一覧を取得できませんでした。',
+  }
 }
 
 function applyTextToTagInput(value) {
@@ -210,8 +272,48 @@ defineExpose({
       </div>
     </div>
 
+    <div class="mt-2">
+      <div class="small text-muted mb-1">Model</div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span
+          v-if="form.modelName"
+          class="badge text-bg-info image-model-badge"
+          :title="form.modelName"
+        >
+          {{ form.modelName }}
+        </span>
+        <span v-else class="small text-muted">未設定</span>
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          @click="showModelSelectModal = true"
+        >
+          モデル設定
+        </button>
+        <button
+          v-if="form.modelName"
+          type="button"
+          class="btn btn-outline-danger btn-sm"
+          @click="clearModelName"
+        >
+          解除
+        </button>
+      </div>
+    </div>
+
     <button type="submit" class="btn btn-primary btn-sm w-100 mt-2">
       {{ isDirty ? '保存して戻る' : '表示に戻る' }}
     </button>
+    <ImageModelSelectModal
+      :show="showModelSelectModal"
+      :selected-model-name="form.modelName"
+      :models="modelSearchState.items"
+      :total-count="modelSearchState.totalCount"
+      :is-loading="modelSearchState.isLoading"
+      :external-message="modelSearchState.message"
+      @close="closeModelSelectModal"
+      @search="handleSearchModels"
+      @apply="applyModelName"
+    />
   </form>
 </template>

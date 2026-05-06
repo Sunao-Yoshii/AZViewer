@@ -36,6 +36,7 @@ AZViewer/
       startup_cleanup_service.py
       tag_normalize_service.py
       thumbnail_cache_service.py
+      wildcard_export_service.py
   build_windows.ps1
   frontend/
     index.html
@@ -55,8 +56,10 @@ AZViewer/
         form/
           DuplicateTagSetModal.vue
           FolderSearchModal.vue
+          ModelSearchModal.vue
           search_form.vue
           TagSearchModal.vue
+          WildcardExportModal.vue
         layout/
           AppFooter.vue
           AppHeader.vue
@@ -68,6 +71,7 @@ AZViewer/
           edit.vue
           ImageDetailModal.vue
           ImageMetadataModal.vue
+          ImageModelSelectModal.vue
           tile.vue
         upload/
           ErrorModal.vue
@@ -83,6 +87,7 @@ AZViewer/
         useLoadingOverlay.js
         usePromptTagImport.js
         useToast.js
+        useWildcardExport.js
       main.js
       services/
         backendApi.js
