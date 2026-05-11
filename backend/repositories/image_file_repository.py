@@ -584,6 +584,36 @@ class ImageFileRepository:
             self._connection.rollback()
             raise
 
+    def bulk_update_attributes(self, record_ids: list[int], updates: dict | None) -> int:
+        """指定ID群の許可された属性だけを一括更新し、更新件数を返す。"""
+
+        if not record_ids:
+            return 0
+
+        update_values = self._filter_bulk_attribute_updates(updates)
+        if not update_values:
+            return 0
+
+        set_clauses, params = self._build_bulk_attribute_update_params(
+            record_ids,
+            update_values,
+        )
+        id_placeholders = ", ".join(f":id_{index}" for index in range(len(record_ids)))
+        sql = f"""
+            UPDATE image_file_data
+            SET {", ".join(set_clauses)}
+            WHERE id IN ({id_placeholders})
+        """
+
+        try:
+            cursor = self._connection.execute(sql, params)
+            updated_count = cursor.rowcount
+            self._connection.commit()
+            return updated_count
+        except Exception:
+            self._connection.rollback()
+            raise
+
     def update_detail(
         self,
         record_id: int,
@@ -1147,3 +1177,32 @@ class ImageFileRepository:
             raise ValueError("is_checked must be 0 or 1.")
         if is_favorite not in {0, 1}:
             raise ValueError("is_favorite must be 0 or 1.")
+
+    def _filter_bulk_attribute_updates(self, updates: dict | None) -> dict[str, object]:
+        """一括属性更新で許可されたカラムだけを抽出する。"""
+
+        allowed_columns = {"rating", "is_checked", "is_favorite"}
+        return {
+            key: value
+            for key, value in (updates or {}).items()
+            if key in allowed_columns
+        }
+
+    def _build_bulk_attribute_update_params(
+        self,
+        record_ids: list[int],
+        update_values: dict[str, object],
+    ) -> tuple[list[str], dict[str, object]]:
+        """一括属性更新SQLのSET句とパラメータを組み立てる。"""
+
+        set_clauses = []
+        params = {}
+
+        for key, value in update_values.items():
+            set_clauses.append(f"{key} = :{key}")
+            params[key] = value
+
+        for index, record_id in enumerate(record_ids):
+            params[f"id_{index}"] = record_id
+
+        return set_clauses, params

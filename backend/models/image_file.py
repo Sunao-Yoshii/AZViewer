@@ -49,6 +49,22 @@ class ImageFileListItem:
 
 
 @dataclass(frozen=True)
+class BulkAttributeUpdateResult:
+    """画像属性の一括更新処理結果を表す。"""
+
+    target_count: int
+    updated_count: int
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "targetCount": self.target_count,
+            "updatedCount": self.updated_count,
+        }
+
+
+@dataclass(frozen=True)
 class TagListItem:
     """タグ検索候補の1件分データを表す。"""
 

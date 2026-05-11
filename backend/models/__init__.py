@@ -1,4 +1,5 @@
 from .image_file import (
+    BulkAttributeUpdateResult,
     DuplicateTagSetItem,
     FileMoveFailure,
     FileMoveResult,
@@ -17,6 +18,7 @@ from .image_file import (
 )
 
 __all__ = [
+    "BulkAttributeUpdateResult",
     "DuplicateTagSetItem",
     "FileMoveFailure",
     "FileMoveResult",

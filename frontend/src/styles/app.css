@@ -440,6 +440,20 @@ body {
   overflow: auto;
 }
 
+.bulk-attribute-edit-section {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--bs-border-color);
+}
+
+.bulk-attribute-edit-section:last-child {
+  border-bottom: 0;
+}
+
+.bulk-attribute-edit-title {
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
 .image-detail-body {
   min-height: 0;
   overflow: auto;

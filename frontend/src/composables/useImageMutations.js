@@ -1,4 +1,6 @@
+import { reactive } from 'vue'
 import {
+  bulkUpdateImageFileAttributes,
   deleteImageFile,
   deleteImageFilesWithPhysicalFiles,
   moveImageFilesToFolder,
@@ -81,7 +83,74 @@ function pushMoveResultToast(pushToast, result, targetCount) {
   })
 }
 
+function createBulkAttributeEditForm() {
+  return {
+    ratingEnabled: false,
+    rating: 'General',
+    checkedEnabled: false,
+    isChecked: false,
+    favoriteEnabled: false,
+    isFavorite: false,
+  }
+}
+
+function buildBulkAttributeUpdates(form) {
+  const updates = {}
+
+  if (form.ratingEnabled) {
+    updates.rating = form.rating
+  }
+
+  if (form.checkedEnabled) {
+    updates.isChecked = form.isChecked ? 1 : 0
+  }
+
+  if (form.favoriteEnabled) {
+    updates.isFavorite = form.isFavorite ? 1 : 0
+  }
+
+  return updates
+}
+
+function pushBulkAttributeUpdateSuccessToast(pushToast, result, targetCount) {
+  const data = result?.data ?? {}
+  pushToast({
+    type: 'success',
+    message: `選択画像の属性を更新しました。対象: ${data.targetCount ?? targetCount} 件 / 更新: ${data.updatedCount ?? 0} 件`,
+  })
+}
+
+function validateBulkAttributeEditRequest(pushToast, targetIds, updates) {
+  if (targetIds.length === 0) {
+    pushToast({
+      type: 'warning',
+      message: '一括編集する画像を選択してください。',
+    })
+    return false
+  }
+
+  if (Object.keys(updates).length === 0) {
+    pushToast({
+      type: 'warning',
+      message: '変更する項目を選択してください。',
+    })
+    return false
+  }
+
+  return true
+}
+
 export function useImageMutations({ pushToast, refresh, loading }) {
+  const bulkAttributeEditModal = reactive({
+    show: false,
+    isSaving: false,
+    form: createBulkAttributeEditForm(),
+  })
+
+  function resetBulkAttributeEditForm() {
+    bulkAttributeEditModal.form = createBulkAttributeEditForm()
+  }
+
   async function handleDelete(id) {
     if (!window.confirm('このアプリケーション上から削除します。よろしいですか？')) {
       return
@@ -93,6 +162,73 @@ export function useImageMutations({ pushToast, refresh, loading }) {
       return
     }
     await refresh({}, true)
+  }
+
+  function openBulkAttributeEditModal({ ids }) {
+    const targetIds = [...(ids ?? [])]
+
+    if (targetIds.length === 0) {
+      pushToast({
+        type: 'warning',
+        message: '一括編集する画像を選択してください。',
+      })
+      return
+    }
+
+    resetBulkAttributeEditForm()
+    bulkAttributeEditModal.show = true
+  }
+
+  function closeBulkAttributeEditModal() {
+    bulkAttributeEditModal.show = false
+    bulkAttributeEditModal.isSaving = false
+    resetBulkAttributeEditForm()
+  }
+
+  function updateBulkAttributeEditForm({ key, value }) {
+    if (!(key in bulkAttributeEditModal.form)) {
+      return
+    }
+
+    bulkAttributeEditModal.form[key] = value
+  }
+
+  async function saveBulkAttributeEdit({ ids, refresh: refreshSelected, clearSelection }) {
+    const targetIds = [...(ids ?? [])]
+    const updates = buildBulkAttributeUpdates(bulkAttributeEditModal.form)
+
+    if (!validateBulkAttributeEditRequest(pushToast, targetIds, updates)) {
+      return
+    }
+
+    bulkAttributeEditModal.isSaving = true
+
+    try {
+      const result = await bulkUpdateImageFileAttributes({
+        ids: targetIds,
+        updates,
+      })
+
+      if (!result?.success) {
+        pushToast({
+          type: 'danger',
+          message: result?.message || '選択画像の属性更新に失敗しました。',
+        })
+        return
+      }
+
+      pushBulkAttributeUpdateSuccessToast(pushToast, result, targetIds.length)
+      clearSelection?.()
+      await refreshSelected?.()
+      closeBulkAttributeEditModal()
+    } catch (error) {
+      pushToast({
+        type: 'danger',
+        message: '選択画像の属性更新に失敗しました。',
+      })
+    } finally {
+      bulkAttributeEditModal.isSaving = false
+    }
   }
 
   async function deleteSelectedImages({ ids, refresh: refreshSelected, clearSelection }) {
@@ -178,9 +314,14 @@ export function useImageMutations({ pushToast, refresh, loading }) {
   }
 
   return {
+    bulkAttributeEditModal,
+    closeBulkAttributeEditModal,
     deleteSelectedImages,
     handleDelete,
     handleSaveDetail,
     moveSelectedImages,
+    openBulkAttributeEditModal,
+    saveBulkAttributeEdit,
+    updateBulkAttributeEditForm,
   }
 }

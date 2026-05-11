@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import BulkAttributeEditModal from './components/form/BulkAttributeEditModal.vue'
 import DuplicateTagSetModal from './components/form/DuplicateTagSetModal.vue'
 import WildcardExportModal from './components/form/WildcardExportModal.vue'
 import LoadingOverlay from './components/common/LoadingOverlay.vue'
@@ -22,6 +23,17 @@ const loading = useLoadingOverlay()
 const selectedImageIdSet = ref(new Set())
 const selectedImageIds = computed(() => [...selectedImageIdSet.value])
 const selectedCount = computed(() => selectedImageIds.value.length)
+const visibleImageIds = computed(() => (searchResult.value.items ?? []).map((item) => item.id))
+const visibleCount = computed(() => visibleImageIds.value.length)
+const isAllVisibleSelected = computed(() => {
+  const ids = visibleImageIds.value
+
+  if (ids.length === 0) {
+    return false
+  }
+
+  return ids.every((id) => selectedImageIdSet.value.has(id))
+})
 
 const {
   appInfo,
@@ -53,17 +65,18 @@ const {
   setStatus,
   loading,
 })
-const {
-  deleteSelectedImages,
-  handleDelete,
-  handleSaveDetail,
-  moveSelectedImages,
-} = useImageMutations({
+const imageMutations = useImageMutations({
   pushToast,
   setStatus,
   refresh: executeSearch,
   loading,
 })
+const {
+  deleteSelectedImages,
+  handleDelete,
+  handleSaveDetail,
+  moveSelectedImages,
+} = imageMutations
 const {
   isImporting: isImportingPromptTags,
   handleImportPromptTags,
@@ -92,6 +105,24 @@ function handleSelectionChange({ id, selected }) {
   } else {
     next.delete(id)
   }
+  selectedImageIdSet.value = next
+}
+
+function handleToggleVisibleSelection() {
+  const ids = visibleImageIds.value
+
+  if (ids.length === 0) {
+    return
+  }
+
+  const next = new Set(selectedImageIdSet.value)
+
+  if (isAllVisibleSelected.value) {
+    ids.forEach((id) => next.delete(id))
+  } else {
+    ids.forEach((id) => next.add(id))
+  }
+
   selectedImageIdSet.value = next
 }
 
@@ -130,6 +161,20 @@ async function handleDeleteSelectedImages() {
 
 async function handleMoveSelectedImages() {
   await moveSelectedImages({
+    ids: selectedImageIds.value,
+    refresh: executeSearch,
+    clearSelection,
+  })
+}
+
+function handleOpenBulkAttributeEdit() {
+  imageMutations.openBulkAttributeEditModal({
+    ids: selectedImageIds.value,
+  })
+}
+
+async function handleSaveBulkAttributeEdit() {
+  await imageMutations.saveBulkAttributeEdit({
     ids: selectedImageIds.value,
     refresh: executeSearch,
     clearSelection,
@@ -182,11 +227,15 @@ onBeforeUnmount(() => {
     :is-searching="isSearching || isImportingPromptTags"
     :selected-count="selectedCount"
     :selected-image-ids="selectedImageIds"
+    :visible-count="visibleCount"
+    :is-all-visible-selected="isAllVisibleSelected"
     @search="handleSearchWithSelectionClear"
     @import-complete="handleImportCompleteWithSelectionClear"
     @import-prompt-tags="handleImportPromptTags"
+    @toggle-visible-selection="handleToggleVisibleSelection"
     @delete-selected-images="handleDeleteSelectedImages"
     @move-selected-images="handleMoveSelectedImages"
+    @open-bulk-attribute-edit="handleOpenBulkAttributeEdit"
     @open-wildcard-export="handleOpenWildcardExport"
     @open-duplicate-tag-sets="duplicateTagSetSearch.openDuplicateTagSetModal"
   >
@@ -232,6 +281,15 @@ onBeforeUnmount(() => {
     @change-mode="wildcardExport.changeWildcardExportMode"
     @toggle-tag="wildcardExport.toggleWildcardExportTag"
     @save="wildcardExport.saveWildcardExport"
+  />
+  <BulkAttributeEditModal
+    :show="imageMutations.bulkAttributeEditModal.show"
+    :selected-count="selectedCount"
+    :form="imageMutations.bulkAttributeEditModal.form"
+    :is-saving="imageMutations.bulkAttributeEditModal.isSaving"
+    @close="imageMutations.closeBulkAttributeEditModal"
+    @update-form="imageMutations.updateBulkAttributeEditForm"
+    @save="handleSaveBulkAttributeEdit"
   />
   <LoadingOverlay
     :show="loading.loadingOverlay.show"

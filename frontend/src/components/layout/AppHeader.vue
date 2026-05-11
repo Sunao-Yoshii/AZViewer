@@ -12,12 +12,22 @@ defineProps({
     type: Number,
     default: 0,
   },
+  visibleCount: {
+    type: Number,
+    default: 0,
+  },
+  isAllVisibleSelected: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 defineEmits([
   'import-prompt-tags',
+  'toggle-visible-selection',
   'delete-selected-images',
   'move-selected-images',
+  'open-bulk-attribute-edit',
   'open-wildcard-export',
   'open-duplicate-tag-sets',
 ])
@@ -28,6 +38,22 @@ defineEmits([
     <div class="container-fluid">
       <span class="navbar-brand mb-0 h1">{{ appInfo?.name ?? 'AZViewer' }}</span>
       <div class="app-header-actions">
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm"
+          :disabled="isBusy || visibleCount === 0"
+          @click="$emit('toggle-visible-selection')"
+        >
+          {{ isAllVisibleSelected ? '表示中の選択を解除' : `表示中をすべて選択 (${visibleCount})` }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline-primary btn-sm"
+          :disabled="isBusy || selectedCount === 0"
+          @click="$emit('open-bulk-attribute-edit')"
+        >
+          選択画像を一括編集 ({{ selectedCount }})
+        </button>
         <button
           type="button"
           class="btn btn-outline-success btn-sm"

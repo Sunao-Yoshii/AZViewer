@@ -28,14 +28,24 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  visibleCount: {
+    type: Number,
+    default: 0,
+  },
+  isAllVisibleSelected: {
+    type: Boolean,
+    default: false,
+  },
 })
 
 defineEmits([
   'search',
   'import-complete',
   'import-prompt-tags',
+  'toggle-visible-selection',
   'delete-selected-images',
   'move-selected-images',
+  'open-bulk-attribute-edit',
   'open-wildcard-export',
   'open-duplicate-tag-sets',
   'selection-change',
@@ -54,9 +64,13 @@ defineEmits([
       :app-info="appInfo"
       :is-busy="isSearching"
       :selected-count="selectedCount"
+      :visible-count="visibleCount"
+      :is-all-visible-selected="isAllVisibleSelected"
       @import-prompt-tags="$emit('import-prompt-tags')"
+      @toggle-visible-selection="$emit('toggle-visible-selection')"
       @delete-selected-images="$emit('delete-selected-images')"
       @move-selected-images="$emit('move-selected-images')"
+      @open-bulk-attribute-edit="$emit('open-bulk-attribute-edit')"
       @open-wildcard-export="$emit('open-wildcard-export')"
       @open-duplicate-tag-sets="$emit('open-duplicate-tag-sets')"
     />

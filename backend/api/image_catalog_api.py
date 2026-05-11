@@ -8,6 +8,7 @@ from typing import Any
 
 from backend.repositories import ImageFileRepository
 from backend.models import (
+    BulkAttributeUpdateResult,
     FileMoveFailure,
     FileMoveResult,
     ImageFileListItem,
@@ -97,6 +98,55 @@ class ImageCatalogApi:
             message="Image file detail updated.",
             data={**detail, "tags": tags, "modelName": model_name},
         ).to_dict()
+
+    def bulk_update_image_file_attributes(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定レコード群の画像属性を一括更新する。"""
+
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            record_ids = self._normalize_record_ids(data.get("ids"))
+            if not record_ids:
+                return ApiResponse(
+                    success=False,
+                    message="更新対象が指定されていません。",
+                    data=self._empty_bulk_attribute_update_data(),
+                ).to_dict()
+
+            try:
+                updates = self._normalize_bulk_attribute_updates(data.get("updates"))
+            except ValueError as exc:
+                return ApiResponse(
+                    success=False,
+                    message=str(exc),
+                    data=self._empty_bulk_attribute_update_data(),
+                ).to_dict()
+
+            if not updates:
+                return ApiResponse(
+                    success=False,
+                    message="更新項目が指定されていません。",
+                    data=self._empty_bulk_attribute_update_data(),
+                ).to_dict()
+
+            updated_count = self._get_repository().bulk_update_attributes(
+                record_ids=record_ids,
+                updates=updates,
+            )
+            result = BulkAttributeUpdateResult(
+                target_count=len(record_ids),
+                updated_count=updated_count,
+            )
+            return ApiResponse(
+                success=True,
+                message="選択画像の属性を更新しました。",
+                data=result.to_api_data(),
+            ).to_dict()
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="選択画像の属性更新に失敗しました。",
+                data=self._empty_bulk_attribute_update_data(),
+            ).to_dict()
 
     def delete_image_file(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """指定レコードを削除し、対応するサムネイルを削除する。"""
@@ -582,6 +632,39 @@ class ImageCatalogApi:
             record_ids.append(record_id)
         return record_ids
 
+    def _normalize_bulk_attribute_updates(self, value: object) -> dict[str, object]:
+        """一括属性更新ペイロードをリポジトリ用の値へ正規化する。"""
+
+        if not isinstance(value, dict):
+            return {}
+
+        updates: dict[str, object] = {}
+        if "rating" in value:
+            rating = str(value.get("rating") or "").strip()
+            if rating not in ("General", "R-15", "R-18", "R-18G"):
+                raise ValueError("不正なレーティングが指定されています。")
+            updates["rating"] = rating
+
+        if "isChecked" in value:
+            updates["is_checked"] = self._normalize_flag_value(value.get("isChecked"))
+
+        if "isFavorite" in value:
+            updates["is_favorite"] = self._normalize_flag_value(value.get("isFavorite"))
+
+        return updates
+
+    def _normalize_flag_value(self, value: object) -> int:
+        """フラグ値を0または1へ正規化する。"""
+
+        try:
+            normalized = int(value)
+        except (TypeError, ValueError):
+            raise ValueError("不正なフラグ値が指定されています。")
+
+        if normalized not in (0, 1):
+            raise ValueError("不正なフラグ値が指定されています。")
+        return normalized
+
     def _normalize_destination_folder(self, value: object) -> Path:
         """移動先フォルダを絶対パス化し、存在するディレクトリか検証する。"""
 
@@ -628,6 +711,14 @@ class ImageCatalogApi:
             mode="",
             line_count=0,
             cancelled=False,
+        ).to_api_data()
+
+    def _empty_bulk_attribute_update_data(self) -> dict[str, object]:
+        """一括属性更新API用の空結果データを返す。"""
+
+        return BulkAttributeUpdateResult(
+            target_count=0,
+            updated_count=0,
         ).to_api_data()
 
     def _delete_physical_files_and_records(

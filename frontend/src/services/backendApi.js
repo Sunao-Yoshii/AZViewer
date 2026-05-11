@@ -68,6 +68,10 @@ export async function updateImageFileDetail(payload) {
   return await callBackendApi('update_image_file_detail', payload)
 }
 
+export async function bulkUpdateImageFileAttributes(payload) {
+  return await callBackendApi('bulk_update_image_file_attributes', payload)
+}
+
 export async function deleteImageFile(id) {
   return await callBackendApi('delete_image_file', { id })
 }

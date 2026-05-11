@@ -100,6 +100,11 @@ class AppApi:
 
         return self._image_catalog_api.update_image_file_detail(payload)
 
+    def bulk_update_image_file_attributes(self, payload: dict[str, object]) -> dict[str, object]:
+        """選択された画像の属性を一括更新する。"""
+
+        return self._image_catalog_api.bulk_update_image_file_attributes(payload)
+
     def delete_image_file(self, payload: dict[str, object]) -> dict[str, object]:
         """指定レコードを削除する。"""
 
