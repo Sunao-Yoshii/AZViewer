@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
+import traceback
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 import webview
 from webview.dom import DOMEventHandler
@@ -13,6 +15,7 @@ APP_TITLE = "AZViewer"
 ROOT_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parents[1]))
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
+APP_DIR = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else ROOT_DIR
 
 try:
     from .api.app_api import AppApi
@@ -21,6 +24,105 @@ except ImportError:
 
 
 FRONTEND_DIST = ROOT_DIR / "frontend" / "dist" / "index.html"
+SMOKE_TEST_ARGUMENT = "--smoke-test-runtime"
+LOG_FILE_NAME = "azviewer.log"
+
+
+class TeeStream:
+    """Write process output to both the original stream and the log file."""
+
+    def __init__(self, original: TextIO | None, log_file: TextIO) -> None:
+        self._original = original
+        self._log_file = log_file
+
+    def write(self, message: str) -> int:
+        if self._original:
+            self._original.write(message)
+
+        return self._log_file.write(message)
+
+    def flush(self) -> None:
+        if self._original:
+            self._original.flush()
+
+        self._log_file.flush()
+
+
+def candidate_log_dirs() -> list[Path]:
+    """Return writable log directory candidates in preference order."""
+
+    configured_log_dir = os.environ.get("AZVIEWER_LOG_DIR")
+    local_app_data = Path(os.environ.get("LOCALAPPDATA", Path.home()))
+    candidates = [
+        local_app_data / "AZViewer" / "logs",
+        APP_DIR / "logs",
+        Path.cwd() / "logs",
+        Path(tempfile.gettempdir()) / "AZViewer" / "logs",
+    ]
+    if configured_log_dir:
+        candidates.insert(0, Path(configured_log_dir))
+
+    return candidates
+
+
+def open_startup_log() -> tuple[TextIO, Path]:
+    """Open the first writable startup log file."""
+
+    last_error: OSError | None = None
+    for log_dir in candidate_log_dirs():
+        try:
+            log_dir.mkdir(parents=True, exist_ok=True)
+            log_path = log_dir / LOG_FILE_NAME
+            return log_path.open("a", encoding="utf-8"), log_path
+        except OSError as exc:
+            last_error = exc
+
+    raise RuntimeError("Could not open AZViewer startup log.") from last_error
+
+
+def configure_startup_logging() -> tuple[TextIO, TextIO | None, TextIO | None]:
+    """Persist startup diagnostics for windowed executions without a console."""
+
+    log_file, log_path = open_startup_log()
+    original_stdout = sys.stdout
+    original_stderr = sys.stderr
+    log_file.write(f"\n=== AZViewer startup: {log_path} ===\n")
+    log_file.flush()
+    sys.stdout = TeeStream(original_stdout, log_file)  # type: ignore[assignment]
+    sys.stderr = TeeStream(original_stderr, log_file)  # type: ignore[assignment]
+    return log_file, original_stdout, original_stderr
+
+
+def run_with_startup_logging() -> int:
+    """Run the app and record failures that would otherwise be invisible."""
+
+    log_file, original_stdout, original_stderr = configure_startup_logging()
+    try:
+        return main()
+    except Exception:
+        print("Unhandled startup error:", file=sys.stderr)
+        traceback.print_exc()
+        return 1
+    finally:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        sys.stdout = original_stdout  # type: ignore[assignment]
+        sys.stderr = original_stderr  # type: ignore[assignment]
+        log_file.close()
+
+
+def smoke_test_runtime() -> int:
+    """Packaged runtime dependencies needed by pywebview on Windows are importable."""
+
+    try:
+        import clr  # noqa: F401
+        import webview.platforms.winforms  # noqa: F401
+    except Exception as exc:
+        print(f"Runtime smoke test failed: {exc}", file=sys.stderr)
+        return 1
+
+    print("Runtime smoke test passed.")
+    return 0
 
 
 def resolve_entry_url() -> str:
@@ -168,4 +270,7 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    if SMOKE_TEST_ARGUMENT in sys.argv:
+        raise SystemExit(smoke_test_runtime())
+
+    raise SystemExit(run_with_startup_logging())

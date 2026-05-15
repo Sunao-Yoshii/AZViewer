@@ -12,11 +12,29 @@ Stable Diffusion WebUI で生成した画像のメタ情報、プロンプト由
 
 - リリースページ: https://github.com/Sunao-Yoshii/AZViewer/releases/tag/1.2.0
 - Windows 版: `AZViewer-windows-portable.zip`
-- ランタイム : .NET4.8+ が必要です。
-  - https://dotnet.microsoft.com/ja-jp/download/dotnet-framework/thank-you/net481-web-installer 
 - 対応 OS Win11 (Win 10 以前は多分無理…)
 
 `AZViewer-windows-portable.zip` を展開し、`AZViewer.exe` を実行してください。Python 実行環境は同梱されているため、利用する PC に Python を別途インストールする必要はありません。
+
+### 実行環境の要件
+
+AZViewer は Windows 11 の最新パッチ適用済み環境での動作を前提にしています。
+
+- OS: Windows 11 64bit
+- .NET Framework: 4.8.1 以上
+- WebView2 Runtime: Evergreen Runtime
+- Python: インストール不要。CPython 3.12 由来の実行環境をアプリに同梱しています。
+- Visual C++ Runtime: インストール不要。必要な `VCRUNTIME140.dll`、`VCRUNTIME140_1.dll`、`ucrtbase.dll` はアプリに同梱しています。
+
+Windows 11 には通常 WebView2 Runtime が含まれますが、企業管理端末、オフライン環境、Windows コンポーネントの破損などで削除または無効化されている場合は、Microsoft Edge WebView2 Runtime の修復または再インストールが必要です。
+
+### 展開と起動時の注意
+
+- 既存の `AZViewer` フォルダへ上書き展開せず、古いフォルダを削除してから新しい `AZViewer-windows-portable.zip` を展開してください。`AZViewer.exe` と `_internal` のバージョンが混在すると起動に失敗することがあります。
+- `C:\Program Files` などの管理者権限が必要な場所ではなく、ユーザーが書き込めるフォルダへ展開してください。AZViewer は起動場所配下の `data` フォルダにデータベースとサムネイルキャッシュを作成します。
+- セキュリティソフトや Microsoft Defender により `_internal` 配下の DLL が隔離された場合、起動に失敗することがあります。隔離履歴を確認し、ZIP を再展開してください。
+- ダブルクリック起動で何も表示されず終了する場合は、`%LOCALAPPDATA%\AZViewer\logs\azviewer.log` を確認してください。起動時の例外や runtime 初期化エラーを記録します。`%LOCALAPPDATA%` に書き込めない環境では、展開先の `logs\azviewer.log`、カレントディレクトリの `logs\azviewer.log`、一時フォルダの `AZViewer\logs\azviewer.log` の順に出力先を切り替えます。
+- ログ出力先を明示したい場合は、環境変数 `AZVIEWER_LOG_DIR` にログフォルダのパスを設定してください。
 
 ## 主な機能
 
@@ -119,6 +137,8 @@ python backend\main.py
 
 ### Windows リリースビルド
 
+リリースビルドは `C:\Python312\python.exe` にインストールした 64bit CPython 3.12 を使用します。PATH に Python を追加する必要はありません。
+
 ```powershell
 .\build_windows.ps1
 ```
@@ -127,6 +147,8 @@ python backend\main.py
 
 - `dist\AZViewer\AZViewer.exe`
 - `dist\AZViewer-windows-portable.zip`
+
+ビルド時には、配布物に Python runtime、pythonnet、clr-loader、WebView2 の .NET interop DLL、Visual C++ runtime が同梱されていることを検証し、完成した EXE で `pythonnet` / WinForms バックエンドの smoke test を実行します。
 
 ---
 
