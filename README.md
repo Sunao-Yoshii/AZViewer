@@ -10,7 +10,7 @@ Stable Diffusion WebUI で生成した画像のメタ情報、プロンプト由
 
 最新版は GitHub Releases から取得できます。
 
-- リリースページ: https://github.com/Sunao-Yoshii/AZViewer/releases/tag/1.2.0
+- リリースページ: https://github.com/Sunao-Yoshii/AZViewer/releases/tag/1.2.1
 - Windows 版: `AZViewer-windows-portable.zip`
 - 対応 OS Win11 (Win 10 以前は多分無理…)
 
