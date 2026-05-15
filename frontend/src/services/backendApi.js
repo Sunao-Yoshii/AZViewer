@@ -108,6 +108,38 @@ export async function fetchModelsForSearch(payload = {}) {
   return await callBackendApi('fetch_models_for_search', payload)
 }
 
+export async function fetchTagsForMaintenance(payload = {}) {
+  return await callBackendApi('fetch_tags_for_maintenance', payload)
+}
+
+export async function deleteTagMaster(id) {
+  return await callBackendApi('delete_tag_master', { id })
+}
+
+export async function replaceTagMaster(payload) {
+  return await callBackendApi('replace_tag_master', payload)
+}
+
+export async function deleteUnusedTags() {
+  return await callBackendApi('delete_unused_tags', {})
+}
+
+export async function fetchModelsForMaintenance(payload = {}) {
+  return await callBackendApi('fetch_models_for_maintenance', payload)
+}
+
+export async function deleteModelMaster(id) {
+  return await callBackendApi('delete_model_master', { id })
+}
+
+export async function replaceModelMaster(payload) {
+  return await callBackendApi('replace_model_master', payload)
+}
+
+export async function deleteUnusedModels() {
+  return await callBackendApi('delete_unused_models', {})
+}
+
 export async function fetchDuplicateTagSets(payload = {}) {
   return await callBackendApi('fetch_duplicate_tag_sets', payload)
 }

@@ -10,8 +10,11 @@ Stable Diffusion WebUI で生成した画像のメタ情報、プロンプト由
 
 最新版は GitHub Releases から取得できます。
 
-- リリースページ: https://github.com/Sunao-Yoshii/AZViewer/releases/tag/1.1.0
+- リリースページ: https://github.com/Sunao-Yoshii/AZViewer/releases/tag/1.2.0
 - Windows 版: `AZViewer-windows-portable.zip`
+- ランタイム : .NET4.8+ が必要です。
+  - https://dotnet.microsoft.com/ja-jp/download/dotnet-framework/thank-you/net481-web-installer 
+- 対応 OS Win11 (Win 10 以前は多分無理…)
 
 `AZViewer-windows-portable.zip` を展開し、`AZViewer.exe` を実行してください。Python 実行環境は同梱されているため、利用する PC に Python を別途インストールする必要はありません。
 
@@ -124,3 +127,13 @@ python backend\main.py
 
 - `dist\AZViewer\AZViewer.exe`
 - `dist\AZViewer-windows-portable.zip`
+
+---
+
+リリースビルドの各種ライブラリバージョンを固定化しました。
+
+- pywebview==6.2.1
+- pythonnet==3.0.5
+- clr-loader==0.2.10
+- Pillow>=11.0.0 はそのまま維持
+- pyinstaller==6.20.0

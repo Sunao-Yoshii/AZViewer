@@ -113,6 +113,100 @@ class ImageModelListItem:
 
 
 @dataclass(frozen=True)
+class MasterMaintenanceItem:
+    """マスタメンテナンス候補の1件分データを表す。"""
+
+    id: int
+    name: str
+    image_count: int
+
+    def to_dict(self) -> dict[str, object]:
+        """API返却用の辞書形式へ変換する。"""
+
+        return {
+            "id": self.id,
+            "name": self.name,
+            "imageCount": self.image_count,
+        }
+
+
+@dataclass(frozen=True)
+class MasterMaintenanceSearchResult:
+    """マスタメンテナンス候補検索結果を表す。"""
+
+    items: list[MasterMaintenanceItem]
+    total_count: int
+    limit: int
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "items": [item.to_dict() for item in self.items],
+            "totalCount": self.total_count,
+            "limit": self.limit,
+        }
+
+
+@dataclass(frozen=True)
+class MasterDeleteResult:
+    """マスタ削除処理の結果を表す。"""
+
+    id: int
+    name: str
+    affected_image_count: int
+    deleted_count: int
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "id": self.id,
+            "name": self.name,
+            "affectedImageCount": self.affected_image_count,
+            "deletedCount": self.deleted_count,
+        }
+
+
+@dataclass(frozen=True)
+class MasterReplaceResult:
+    """マスタ置き換え処理の結果を表す。"""
+
+    source_id: int
+    source_name: str
+    target_id: int
+    target_name: str
+    affected_image_count: int
+    merged: bool
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "sourceId": self.source_id,
+            "sourceName": self.source_name,
+            "targetId": self.target_id,
+            "targetName": self.target_name,
+            "affectedImageCount": self.affected_image_count,
+            "merged": self.merged,
+        }
+
+
+@dataclass(frozen=True)
+class MasterBulkDeleteResult:
+    """未使用マスタ一括削除処理の結果を表す。"""
+
+    deleted_count: int
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "deletedCount": self.deleted_count,
+        }
+
+
+@dataclass(frozen=True)
 class DuplicateTagSetItem:
     """重複しているタグ構成の1件分データを表す。"""
 

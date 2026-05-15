@@ -1,2 +1,4 @@
-pywebview>=5.0
+pywebview==6.2.1
+pythonnet==3.0.5
+clr-loader==0.2.10
 Pillow>=11.0.0

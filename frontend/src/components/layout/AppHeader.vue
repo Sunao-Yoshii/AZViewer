@@ -30,6 +30,7 @@ defineEmits([
   'open-bulk-attribute-edit',
   'open-wildcard-export',
   'open-duplicate-tag-sets',
+  'open-master-maintenance',
 ])
 </script>
 
@@ -94,6 +95,36 @@ defineEmits([
         >
           重複タグ構成の検索
         </button>
+        <div class="dropdown">
+          <button
+            class="btn btn-outline-secondary btn-sm dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            :disabled="isBusy"
+          >
+            マスタメンテナンス
+          </button>
+          <ul class="dropdown-menu">
+            <li>
+              <button
+                type="button"
+                class="dropdown-item"
+                @click="$emit('open-master-maintenance', 'tag')"
+              >
+                タグメンテナンス
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="dropdown-item"
+                @click="$emit('open-master-maintenance', 'model')"
+              >
+                モデルメンテナンス
+              </button>
+            </li>
+          </ul>
+        </div>
         <span class="text-secondary small d-none d-sm-inline">
           {{ appInfo?.version ? `v${appInfo.version}` : 'Vue + pywebview' }}
         </span>

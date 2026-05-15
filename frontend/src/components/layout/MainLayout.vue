@@ -48,6 +48,7 @@ defineEmits([
   'open-bulk-attribute-edit',
   'open-wildcard-export',
   'open-duplicate-tag-sets',
+  'open-master-maintenance',
   'selection-change',
   'change-page',
   'change-page-size',
@@ -73,6 +74,7 @@ defineEmits([
       @open-bulk-attribute-edit="$emit('open-bulk-attribute-edit')"
       @open-wildcard-export="$emit('open-wildcard-export')"
       @open-duplicate-tag-sets="$emit('open-duplicate-tag-sets')"
+      @open-master-maintenance="$emit('open-master-maintenance', $event)"
     />
 
     <div class="app-body d-flex">

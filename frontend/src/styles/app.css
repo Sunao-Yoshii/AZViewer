@@ -416,6 +416,25 @@ body {
   text-align: left;
 }
 
+.master-maintenance-badge-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-height: 40vh;
+  overflow: auto;
+}
+
+.master-maintenance-badge {
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.master-maintenance-edit-card {
+  margin-top: 1rem;
+}
+
 .wildcard-export-tags {
   display: flex;
   flex-wrap: wrap;

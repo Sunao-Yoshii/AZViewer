@@ -12,6 +12,7 @@ from backend.models import (
     FileMoveFailure,
     FileMoveResult,
     ImageFileListItem,
+    MasterMaintenanceSearchResult,
     PhysicalDeleteFailure,
     PhysicalDeleteResult,
     PromptTagImportResult,
@@ -415,6 +416,108 @@ class ImageCatalogApi:
             },
         ).to_dict()
 
+    def fetch_tags_for_maintenance(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """タグメンテナンス候補を使用件数付きで返す。"""
+
+        return self._fetch_master_maintenance_items(payload, "tag")
+
+    def fetch_models_for_maintenance(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """モデルメンテナンス候補を使用件数付きで返す。"""
+
+        return self._fetch_master_maintenance_items(payload, "model")
+
+    def delete_tag_master(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """タグマスタを削除し、紐づく画像から解除する。"""
+
+        try:
+            tag_id = self._normalize_master_id(payload)
+            result = self._get_repository().delete_tag_master(tag_id)
+            return ApiResponse(
+                success=True,
+                message="タグを削除しました。",
+                data=result.to_api_data(),
+            ).to_dict()
+        except ValueError as exc:
+            return ApiResponse(success=False, message=str(exc), data=None).to_dict()
+        except Exception:
+            return ApiResponse(success=False, message="タグの削除に失敗しました。", data=None).to_dict()
+
+    def replace_tag_master(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """タグマスタ名を変更または既存タグへ統合する。"""
+
+        try:
+            tag_id = self._normalize_master_id(payload)
+            new_name = self._normalize_replacement_tag_name(payload)
+            result = self._get_repository().replace_tag_master(tag_id, new_name)
+            return ApiResponse(
+                success=True,
+                message="タグを置き換えました。",
+                data=result.to_api_data(),
+            ).to_dict()
+        except ValueError as exc:
+            return ApiResponse(success=False, message=str(exc), data=None).to_dict()
+        except Exception:
+            return ApiResponse(success=False, message="タグの置き換えに失敗しました。", data=None).to_dict()
+
+    def delete_unused_tags(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """未使用タグマスタを一括削除する。"""
+
+        try:
+            result = self._get_repository().delete_unused_tags()
+            return ApiResponse(
+                success=True,
+                message="未使用タグを削除しました。",
+                data=result.to_api_data(),
+            ).to_dict()
+        except Exception:
+            return ApiResponse(success=False, message="未使用タグの削除に失敗しました。", data=None).to_dict()
+
+    def delete_model_master(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """モデルマスタを削除し、紐づく画像から解除する。"""
+
+        try:
+            model_id = self._normalize_master_id(payload)
+            result = self._get_repository().delete_model_master(model_id)
+            return ApiResponse(
+                success=True,
+                message="モデルを削除しました。",
+                data=result.to_api_data(),
+            ).to_dict()
+        except ValueError as exc:
+            return ApiResponse(success=False, message=str(exc), data=None).to_dict()
+        except Exception:
+            return ApiResponse(success=False, message="モデルの削除に失敗しました。", data=None).to_dict()
+
+    def replace_model_master(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """モデルマスタ名を変更または既存モデルへ統合する。"""
+
+        try:
+            model_id = self._normalize_master_id(payload)
+            new_name = self._normalize_replacement_model_name(payload)
+            result = self._get_repository().replace_model_master(model_id, new_name)
+            return ApiResponse(
+                success=True,
+                message="モデルを置き換えました。",
+                data=result.to_api_data(),
+            ).to_dict()
+        except ValueError as exc:
+            return ApiResponse(success=False, message=str(exc), data=None).to_dict()
+        except Exception:
+            return ApiResponse(success=False, message="モデルの置き換えに失敗しました。", data=None).to_dict()
+
+    def delete_unused_models(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """未使用モデルマスタを一括削除する。"""
+
+        try:
+            result = self._get_repository().delete_unused_models()
+            return ApiResponse(
+                success=True,
+                message="未使用モデルを削除しました。",
+                data=result.to_api_data(),
+            ).to_dict()
+        except Exception:
+            return ApiResponse(success=False, message="未使用モデルの削除に失敗しました。", data=None).to_dict()
+
     def fetch_duplicate_tag_sets(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """重複しているタグ構成一覧を返す。"""
 
@@ -594,6 +697,81 @@ class ImageCatalogApi:
         """モデル候補取得件数を1から256の範囲へ丸める。"""
 
         return self._normalize_tag_search_limit(value)
+
+    def _normalize_master_maintenance_limit(self, value: object) -> int:
+        """マスタメンテナンス候補取得件数を1から50の範囲へ丸める。"""
+
+        try:
+            limit = int(value or 50)
+        except (TypeError, ValueError):
+            limit = 50
+        return max(1, min(limit, 50))
+
+    def _fetch_master_maintenance_items(
+        self,
+        payload: dict[str, Any] | None,
+        mode: str,
+    ) -> dict[str, Any]:
+        """タグまたはモデルのメンテナンス候補を返す。"""
+
+        limit = 50
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            keyword = str(data.get("keyword") or "").strip()
+            limit = self._normalize_master_maintenance_limit(data.get("limit"))
+            repository = self._get_repository()
+            if mode == "tag":
+                items = repository.find_tags_for_maintenance(keyword=keyword, limit=limit)
+                total_count = repository.count_tags_for_maintenance(keyword=keyword)
+            else:
+                items = repository.find_models_for_maintenance(keyword=keyword, limit=limit)
+                total_count = repository.count_models_for_maintenance(keyword=keyword)
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="マスタ一覧の取得に失敗しました。",
+                data=MasterMaintenanceSearchResult([], 0, limit).to_api_data(),
+            ).to_dict()
+
+        return ApiResponse(
+            success=True,
+            message="",
+            data=MasterMaintenanceSearchResult(items, total_count, limit).to_api_data(),
+        ).to_dict()
+
+    def _normalize_master_id(self, payload: dict[str, Any] | None) -> int:
+        """マスタ操作対象IDを正の整数へ正規化する。"""
+
+        data = payload if isinstance(payload, dict) else {}
+        try:
+            master_id = int(data.get("id"))
+        except (TypeError, ValueError):
+            raise ValueError("対象が指定されていません。")
+        if master_id <= 0:
+            raise ValueError("対象が指定されていません。")
+        return master_id
+
+    def _normalize_replacement_tag_name(self, payload: dict[str, Any] | None) -> str:
+        """タグ置き換え先名を既存タグ正規化ルールで1件へ正規化する。"""
+
+        data = payload if isinstance(payload, dict) else {}
+        tags = self._tag_normalize_service.normalize_tags([data.get("newName")])
+        if not tags:
+            raise ValueError("タグ名を入力してください。")
+        if len(tags) > 1:
+            raise ValueError("タグ名は1件だけ指定してください。")
+        return tags[0]
+
+    def _normalize_replacement_model_name(self, payload: dict[str, Any] | None) -> str:
+        """モデル置き換え先名を保存用表記へ正規化する。"""
+
+        data = payload if isinstance(payload, dict) else {}
+        model_name = str(data.get("newName") or "").strip()
+        if not model_name:
+            raise ValueError("モデル名を入力してください。")
+        if len(model_name) > 512:
+            raise ValueError("モデル名は512文字以内で入力してください。")
+        return model_name
 
     def _normalize_detail_payload(self, data: dict[str, Any]) -> dict[str, Any]:
         """詳細更新ペイロードをリポジトリ用の値へ正規化する。"""

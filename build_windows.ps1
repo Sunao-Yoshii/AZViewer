@@ -7,6 +7,7 @@ $BuildTempDir = Join-Path $RootDir "build\tmp"
 $VenvDir = Join-Path $RootDir "build\python-venv-copies"
 $Python = Join-Path $VenvDir "Scripts\python.exe"
 $Npm = "npm"
+$PyInstallerPackage = "pyinstaller==6.20.0"
 $AppName = "AZViewer"
 $DistRoot = Join-Path $RootDir "dist"
 $AppDistDir = Join-Path $DistRoot $AppName
@@ -105,7 +106,7 @@ if (-not (Test-PythonExecutable -Path $Python)) {
 
 Write-Host "Installing Python dependencies..."
 Invoke-CheckedCommand $Python -m pip install --upgrade pip
-Invoke-CheckedCommand $Python -m pip install -r $BackendRequirements pyinstaller
+Invoke-CheckedCommand $Python -m pip install -r $BackendRequirements $PyInstallerPackage
 
 Write-Host "Installing frontend dependencies..."
 Push-Location $FrontendDir

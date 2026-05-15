@@ -150,6 +150,46 @@ class AppApi:
 
         return self._image_catalog_api.fetch_models_for_search(payload)
 
+    def fetch_tags_for_maintenance(self, payload: dict[str, object]) -> dict[str, object]:
+        """タグメンテナンス候補を返す。"""
+
+        return self._image_catalog_api.fetch_tags_for_maintenance(payload)
+
+    def delete_tag_master(self, payload: dict[str, object]) -> dict[str, object]:
+        """タグマスタを削除する。"""
+
+        return self._image_catalog_api.delete_tag_master(payload)
+
+    def replace_tag_master(self, payload: dict[str, object]) -> dict[str, object]:
+        """タグマスタ名を変更または統合する。"""
+
+        return self._image_catalog_api.replace_tag_master(payload)
+
+    def delete_unused_tags(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """未使用タグマスタを一括削除する。"""
+
+        return self._image_catalog_api.delete_unused_tags(payload)
+
+    def fetch_models_for_maintenance(self, payload: dict[str, object]) -> dict[str, object]:
+        """モデルメンテナンス候補を返す。"""
+
+        return self._image_catalog_api.fetch_models_for_maintenance(payload)
+
+    def delete_model_master(self, payload: dict[str, object]) -> dict[str, object]:
+        """モデルマスタを削除する。"""
+
+        return self._image_catalog_api.delete_model_master(payload)
+
+    def replace_model_master(self, payload: dict[str, object]) -> dict[str, object]:
+        """モデルマスタ名を変更または統合する。"""
+
+        return self._image_catalog_api.replace_model_master(payload)
+
+    def delete_unused_models(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """未使用モデルマスタを一括削除する。"""
+
+        return self._image_catalog_api.delete_unused_models(payload)
+
     def fetch_duplicate_tag_sets(self, payload: dict[str, object] | None = None) -> dict[str, object]:
         """重複タグ構成一覧を返す。"""
 

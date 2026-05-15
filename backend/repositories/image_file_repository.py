@@ -11,6 +11,10 @@ from backend.models import (
     ImageModelListItem,
     ImageFileListItem,
     ImageFileRecord,
+    MasterBulkDeleteResult,
+    MasterDeleteResult,
+    MasterMaintenanceItem,
+    MasterReplaceResult,
     SearchImageFilesResult,
     TagListItem,
 )
@@ -534,6 +538,230 @@ class ImageFileRepository:
             ).fetchone()["count"]
         )
 
+    def find_tags_for_maintenance(
+        self,
+        keyword: str | None = None,
+        limit: int = 50,
+    ) -> list[MasterMaintenanceItem]:
+        """タグメンテナンス候補を使用件数付きで取得する。"""
+
+        params = self._build_tag_search_params(keyword, limit)
+        rows = self._connection.execute(
+            """
+            SELECT
+                tag.id,
+                tag.name,
+                COUNT(tag_link.image_file_id) AS image_count
+            FROM tag
+            LEFT JOIN tag_image_link tag_link
+                ON tag_link.tag_id = tag.id
+            WHERE (:keyword = '' OR tag.name LIKE :keyword_like)
+            GROUP BY tag.id, tag.name
+            ORDER BY tag.id ASC
+            LIMIT :limit
+            """,
+            params,
+        ).fetchall()
+        return [self._row_to_master_maintenance_item(row) for row in rows]
+
+    def count_tags_for_maintenance(self, keyword: str | None = None) -> int:
+        """タグメンテナンス候補の条件一致総数を取得する。"""
+
+        params = self._build_tag_search_params(keyword, 1)
+        return int(
+            self._connection.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM tag
+                WHERE (:keyword = '' OR name LIKE :keyword_like)
+                """,
+                params,
+            ).fetchone()["count"]
+        )
+
+    def find_models_for_maintenance(
+        self,
+        keyword: str | None = None,
+        limit: int = 50,
+    ) -> list[MasterMaintenanceItem]:
+        """モデルメンテナンス候補を使用件数付きで取得する。"""
+
+        params = self._build_model_search_params(keyword, limit)
+        rows = self._connection.execute(
+            """
+            SELECT
+                image_model.id,
+                image_model.name,
+                COUNT(model_link.image_file_data_id) AS image_count
+            FROM image_model
+            LEFT JOIN image_model_to_file_data model_link
+                ON model_link.image_model_id = image_model.id
+            WHERE (:keyword = '' OR image_model.name LIKE :keyword_like)
+            GROUP BY image_model.id, image_model.name
+            ORDER BY image_model.id ASC
+            LIMIT :limit
+            """,
+            params,
+        ).fetchall()
+        return [self._row_to_master_maintenance_item(row) for row in rows]
+
+    def count_models_for_maintenance(self, keyword: str | None = None) -> int:
+        """モデルメンテナンス候補の条件一致総数を取得する。"""
+
+        params = self._build_model_search_params(keyword, 1)
+        return int(
+            self._connection.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM image_model
+                WHERE (:keyword = '' OR name LIKE :keyword_like)
+                """,
+                params,
+            ).fetchone()["count"]
+        )
+
+    def delete_tag_master(self, tag_id: int) -> MasterDeleteResult:
+        """タグマスタを削除し、影響画像のtag_hashを再同期する。"""
+
+        try:
+            self._connection.execute("BEGIN")
+            tag = self._find_tag_by_id(tag_id)
+            if tag is None:
+                raise ValueError("削除対象のタグが存在しません。")
+
+            image_ids = self._find_image_ids_by_tag_id(tag_id)
+            self._connection.execute(
+                "DELETE FROM tag_image_link WHERE tag_id = ?",
+                (tag_id,),
+            )
+            cursor = self._connection.execute(
+                "DELETE FROM tag WHERE id = ?",
+                (tag_id,),
+            )
+            self._replace_tag_hashes(image_ids)
+            self._connection.commit()
+            return MasterDeleteResult(
+                id=tag_id,
+                name=str(tag["name"]),
+                affected_image_count=len(image_ids),
+                deleted_count=cursor.rowcount,
+            )
+        except Exception:
+            self._connection.rollback()
+            raise
+
+    def replace_tag_master(self, tag_id: int, new_name: str) -> MasterReplaceResult:
+        """タグマスタ名を変更または既存タグへ統合する。"""
+
+        try:
+            self._connection.execute("BEGIN")
+            source = self._find_tag_by_id(tag_id)
+            if source is None:
+                raise ValueError("置き換え対象のタグが存在しません。")
+            if str(source["name"]) == new_name:
+                raise ValueError("同じタグ名には置き換えできません。")
+
+            image_ids = self._find_image_ids_by_tag_id(tag_id)
+            target = self._find_tag_by_name(new_name)
+            result = self._replace_or_merge_tag(tag_id, source, target, new_name, image_ids)
+            self._replace_tag_hashes(image_ids)
+            self._connection.commit()
+            return result
+        except Exception:
+            self._connection.rollback()
+            raise
+
+    def delete_unused_tags(self) -> MasterBulkDeleteResult:
+        """使用されていないタグマスタを一括削除する。"""
+
+        try:
+            self._connection.execute("BEGIN")
+            cursor = self._connection.execute(
+                """
+                DELETE FROM tag
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM tag_image_link tag_link
+                    WHERE tag_link.tag_id = tag.id
+                )
+                """
+            )
+            self._connection.commit()
+            return MasterBulkDeleteResult(deleted_count=cursor.rowcount)
+        except Exception:
+            self._connection.rollback()
+            raise
+
+    def delete_model_master(self, model_id: int) -> MasterDeleteResult:
+        """モデルマスタを削除し、画像とのリンクを解除する。"""
+
+        try:
+            self._connection.execute("BEGIN")
+            model = self._find_model_by_id(model_id)
+            if model is None:
+                raise ValueError("削除対象のモデルが存在しません。")
+
+            image_ids = self._find_image_ids_by_model_id(model_id)
+            self._connection.execute(
+                "DELETE FROM image_model_to_file_data WHERE image_model_id = ?",
+                (model_id,),
+            )
+            cursor = self._connection.execute(
+                "DELETE FROM image_model WHERE id = ?",
+                (model_id,),
+            )
+            self._connection.commit()
+            return MasterDeleteResult(
+                id=model_id,
+                name=str(model["name"]),
+                affected_image_count=len(image_ids),
+                deleted_count=cursor.rowcount,
+            )
+        except Exception:
+            self._connection.rollback()
+            raise
+
+    def replace_model_master(self, model_id: int, new_name: str) -> MasterReplaceResult:
+        """モデルマスタ名を変更または既存モデルへ統合する。"""
+
+        try:
+            self._connection.execute("BEGIN")
+            source = self._find_model_by_id(model_id)
+            if source is None:
+                raise ValueError("置き換え対象のモデルが存在しません。")
+            if str(source["name"]) == new_name:
+                raise ValueError("同じモデル名には置き換えできません。")
+
+            image_ids = self._find_image_ids_by_model_id(model_id)
+            target = self._find_model_by_name(new_name)
+            result = self._replace_or_merge_model(model_id, source, target, new_name, image_ids)
+            self._connection.commit()
+            return result
+        except Exception:
+            self._connection.rollback()
+            raise
+
+    def delete_unused_models(self) -> MasterBulkDeleteResult:
+        """使用されていないモデルマスタを一括削除する。"""
+
+        try:
+            self._connection.execute("BEGIN")
+            cursor = self._connection.execute(
+                """
+                DELETE FROM image_model
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM image_model_to_file_data model_link
+                    WHERE model_link.image_model_id = image_model.id
+                )
+                """
+            )
+            self._connection.commit()
+            return MasterBulkDeleteResult(deleted_count=cursor.rowcount)
+        except Exception:
+            self._connection.rollback()
+            raise
+
     def delete_by_id(self, record_id: int) -> bool:
         """IDに一致する画像ファイル情報を削除する。"""
 
@@ -933,6 +1161,15 @@ class ImageFileRepository:
             tags=[],
         )
 
+    def _row_to_master_maintenance_item(self, row) -> MasterMaintenanceItem:
+        """SQLite行データをマスタメンテナンス候補DTOへ変換する。"""
+
+        return MasterMaintenanceItem(
+            id=int(row["id"]),
+            name=str(row["name"]),
+            image_count=int(row["image_count"]),
+        )
+
     def _attach_tags(self, items: list[ImageFileListItem]) -> list[ImageFileListItem]:
         """一覧項目群へタグ情報をまとめて付与する。"""
 
@@ -990,6 +1227,181 @@ class ImageFileRepository:
         if row is None:
             raise RuntimeError(f"Tag could not be created: {tag_name}")
         return int(row["id"])
+
+    def _find_tag_by_id(self, tag_id: int):
+        """IDに一致するタグ行を取得する。"""
+
+        return self._connection.execute(
+            "SELECT id, name FROM tag WHERE id = ? LIMIT 1",
+            (tag_id,),
+        ).fetchone()
+
+    def _find_tag_by_name(self, name: str):
+        """名前に一致するタグ行を取得する。"""
+
+        return self._connection.execute(
+            "SELECT id, name FROM tag WHERE name = ? LIMIT 1",
+            (name,),
+        ).fetchone()
+
+    def _find_model_by_id(self, model_id: int):
+        """IDに一致するモデル行を取得する。"""
+
+        return self._connection.execute(
+            "SELECT id, name FROM image_model WHERE id = ? LIMIT 1",
+            (model_id,),
+        ).fetchone()
+
+    def _find_model_by_name(self, name: str):
+        """名前に一致するモデル行を取得する。"""
+
+        return self._connection.execute(
+            "SELECT id, name FROM image_model WHERE name = ? LIMIT 1",
+            (name,),
+        ).fetchone()
+
+    def _find_image_ids_by_tag_id(self, tag_id: int) -> list[int]:
+        """タグに紐づく画像ID一覧を取得する。"""
+
+        rows = self._connection.execute(
+            """
+            SELECT image_file_id
+            FROM tag_image_link
+            WHERE tag_id = ?
+            ORDER BY image_file_id ASC
+            """,
+            (tag_id,),
+        ).fetchall()
+        return [int(row["image_file_id"]) for row in rows]
+
+    def _find_image_ids_by_model_id(self, model_id: int) -> list[int]:
+        """モデルに紐づく画像ID一覧を取得する。"""
+
+        rows = self._connection.execute(
+            """
+            SELECT image_file_data_id
+            FROM image_model_to_file_data
+            WHERE image_model_id = ?
+            ORDER BY image_file_data_id ASC
+            """,
+            (model_id,),
+        ).fetchall()
+        return [int(row["image_file_data_id"]) for row in rows]
+
+    def _replace_tag_hashes(self, image_ids: list[int]) -> None:
+        """指定画像群の現在のタグ構成からtag_hashを再同期する。"""
+
+        for image_id in image_ids:
+            self.replace_tag_hash(image_id)
+
+    def _replace_or_merge_tag(
+        self,
+        tag_id: int,
+        source,
+        target,
+        new_name: str,
+        image_ids: list[int],
+    ) -> MasterReplaceResult:
+        """タグ名更新または既存タグへのリンク統合を行う。"""
+
+        if target is None:
+            self._connection.execute(
+                "UPDATE tag SET name = ? WHERE id = ?",
+                (new_name, tag_id),
+            )
+            return MasterReplaceResult(
+                source_id=tag_id,
+                source_name=str(source["name"]),
+                target_id=tag_id,
+                target_name=new_name,
+                affected_image_count=len(image_ids),
+                merged=False,
+            )
+
+        target_id = int(target["id"])
+        self._merge_tag_links(tag_id, target_id)
+        return MasterReplaceResult(
+            source_id=tag_id,
+            source_name=str(source["name"]),
+            target_id=target_id,
+            target_name=str(target["name"]),
+            affected_image_count=len(image_ids),
+            merged=True,
+        )
+
+    def _merge_tag_links(self, source_tag_id: int, target_tag_id: int) -> None:
+        """重複リンクを避けてsourceタグリンクをtargetタグへ統合する。"""
+
+        self._connection.execute(
+            """
+            DELETE FROM tag_image_link
+            WHERE tag_id = ?
+              AND image_file_id IN (
+                SELECT image_file_id
+                FROM tag_image_link
+                WHERE tag_id = ?
+              )
+            """,
+            (source_tag_id, target_tag_id),
+        )
+        self._connection.execute(
+            """
+            UPDATE tag_image_link
+            SET tag_id = ?
+            WHERE tag_id = ?
+            """,
+            (target_tag_id, source_tag_id),
+        )
+        self._connection.execute(
+            "DELETE FROM tag WHERE id = ?",
+            (source_tag_id,),
+        )
+
+    def _replace_or_merge_model(
+        self,
+        model_id: int,
+        source,
+        target,
+        new_name: str,
+        image_ids: list[int],
+    ) -> MasterReplaceResult:
+        """モデル名更新または既存モデルへのリンク統合を行う。"""
+
+        if target is None:
+            self._connection.execute(
+                "UPDATE image_model SET name = ? WHERE id = ?",
+                (new_name, model_id),
+            )
+            return MasterReplaceResult(
+                source_id=model_id,
+                source_name=str(source["name"]),
+                target_id=model_id,
+                target_name=new_name,
+                affected_image_count=len(image_ids),
+                merged=False,
+            )
+
+        target_id = int(target["id"])
+        self._connection.execute(
+            """
+            UPDATE image_model_to_file_data
+            SET image_model_id = ?
+            WHERE image_model_id = ?
+            """,
+            (target_id, model_id),
+        )
+        self._connection.execute(
+            "DELETE FROM image_model WHERE id = ?",
+            (model_id,),
+        )
+        return MasterReplaceResult(
+            source_id=model_id,
+            source_name=str(source["name"]),
+            target_id=target_id,
+            target_name=str(target["name"]),
+            affected_image_count=len(image_ids),
+            merged=True,
+        )
 
     def _build_order_by(self, sort: str) -> str:
         """許可済みソート値からORDER BY句を生成する。"""

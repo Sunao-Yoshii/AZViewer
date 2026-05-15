@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import BulkAttributeEditModal from './components/form/BulkAttributeEditModal.vue'
 import DuplicateTagSetModal from './components/form/DuplicateTagSetModal.vue'
+import MasterMaintenanceModal from './components/form/MasterMaintenanceModal.vue'
 import WildcardExportModal from './components/form/WildcardExportModal.vue'
 import LoadingOverlay from './components/common/LoadingOverlay.vue'
 import Content from './components/layout/Content.vue'
@@ -14,6 +15,7 @@ import { useImageMutations } from './composables/useImageMutations'
 import { usePromptTagImport } from './composables/usePromptTagImport'
 import { useImageSearch } from './composables/useImageSearch'
 import { useLoadingOverlay } from './composables/useLoadingOverlay'
+import { useMasterMaintenance } from './composables/useMasterMaintenance'
 import { useToast } from './composables/useToast'
 import { useWildcardExport } from './composables/useWildcardExport'
 
@@ -92,6 +94,11 @@ const duplicateTagSetSearch = useDuplicateTagSetSearch({
 const wildcardExport = useWildcardExport({
   pushToast,
   clearSelection,
+})
+const masterMaintenance = useMasterMaintenance({
+  pushToast,
+  loading,
+  refresh: executeSearch,
 })
 
 function clearSelection() {
@@ -238,6 +245,7 @@ onBeforeUnmount(() => {
     @open-bulk-attribute-edit="handleOpenBulkAttributeEdit"
     @open-wildcard-export="handleOpenWildcardExport"
     @open-duplicate-tag-sets="duplicateTagSetSearch.openDuplicateTagSetModal"
+    @open-master-maintenance="masterMaintenance.openMasterMaintenance"
   >
     <Content
       :search-result="searchResult"
@@ -290,6 +298,27 @@ onBeforeUnmount(() => {
     @close="imageMutations.closeBulkAttributeEditModal"
     @update-form="imageMutations.updateBulkAttributeEditForm"
     @save="handleSaveBulkAttributeEdit"
+  />
+  <MasterMaintenanceModal
+    :show="masterMaintenance.masterMaintenanceModal.show"
+    :mode="masterMaintenance.masterMaintenanceModal.mode"
+    :active-tab="masterMaintenance.masterMaintenanceModal.activeTab"
+    :keyword="masterMaintenance.masterMaintenanceModal.keyword"
+    :items="masterMaintenance.masterMaintenanceModal.items"
+    :total-count="masterMaintenance.masterMaintenanceModal.totalCount"
+    :selected-item="masterMaintenance.masterMaintenanceModal.selectedItem"
+    :replacement-name="masterMaintenance.masterMaintenanceModal.replacementName"
+    :is-loading="masterMaintenance.masterMaintenanceModal.isLoading"
+    :is-processing="masterMaintenance.masterMaintenanceModal.isProcessing"
+    @close="masterMaintenance.closeMasterMaintenance"
+    @change-tab="masterMaintenance.changeMasterMaintenanceTab"
+    @update-keyword="masterMaintenance.updateMasterMaintenanceKeyword"
+    @search="masterMaintenance.searchMasterMaintenanceItems"
+    @select-item="masterMaintenance.selectMasterMaintenanceItem"
+    @update-replacement-name="masterMaintenance.updateReplacementName"
+    @delete-item="masterMaintenance.deleteMasterMaintenanceItem"
+    @replace-item="masterMaintenance.replaceMasterMaintenanceItem"
+    @delete-unused="masterMaintenance.deleteUnusedMasterItems"
   />
   <LoadingOverlay
     :show="loading.loadingOverlay.show"
