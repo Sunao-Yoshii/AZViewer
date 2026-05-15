@@ -348,6 +348,7 @@ class ImageFileRepository:
         model: str | None = None,
         tag_hash: str | None = None,
         tag_set: str | None = None,
+        tag_keyword: str | None = None,
         page: int = 1,
         page_size: int = 25,
         sort: str = "id_desc",
@@ -366,6 +367,7 @@ class ImageFileRepository:
             model=model,
             tag_hash=tag_hash,
             tag_set=tag_set,
+            tag_keyword=tag_keyword,
         )
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         total_count = int(
@@ -1014,6 +1016,7 @@ class ImageFileRepository:
         model: str | None,
         tag_hash: str | None,
         tag_set: str | None,
+        tag_keyword: str | None,
     ) -> tuple[list[str], list[object]]:
         """画像検索のWHERE条件とパラメータを組み立てる。"""
 
@@ -1041,6 +1044,7 @@ class ImageFileRepository:
 
         self._append_model_condition(where_clauses, params, model)
         self._append_tag_conditions(where_clauses, params, tags)
+        self._append_tag_keyword_condition(where_clauses, params, tag_keyword)
         self._append_tag_hash_condition(where_clauses, params, tag_hash, tag_set)
         return where_clauses, params
 
@@ -1099,6 +1103,32 @@ class ImageFileRepository:
         )
         params.extend([tag_hash, tag_set])
 
+    def _append_tag_keyword_condition(
+        self,
+        where_clauses: list[str],
+        params: list[object],
+        tag_keyword: str | None,
+    ) -> None:
+        """タグ名の部分一致検索条件をWHERE句へ追加する。"""
+
+        keyword = str(tag_keyword or "").strip().lower()
+        if not keyword:
+            return
+
+        where_clauses.append(
+            """
+            EXISTS (
+                SELECT 1
+                FROM tag_image_link tag_link_keyword
+                INNER JOIN tag tag_keyword
+                    ON tag_keyword.id = tag_link_keyword.tag_id
+                WHERE tag_link_keyword.image_file_id = image_file_data.id
+                  AND tag_keyword.name LIKE ? ESCAPE '\\'
+            )
+            """
+        )
+        params.append(f"%{self._escape_like(keyword)}%")
+
     def _append_model_condition(
         self,
         where_clauses: list[str],
@@ -1123,6 +1153,16 @@ class ImageFileRepository:
             """
         )
         params.append(model)
+
+    def _escape_like(self, value: str) -> str:
+        """LIKE検索でワイルドカード扱いされる文字をエスケープする。"""
+
+        return (
+            value
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+        )
 
     def _build_tag_search_params(self, keyword: str | None, limit: int) -> dict[str, object]:
         """タグ候補検索SQL用のパラメータを作る。"""

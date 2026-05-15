@@ -66,6 +66,7 @@ class ImageCatalogApi:
             model=self._normalize_search_model(data.get("model")),
             tag_hash=tag_hash,
             tag_set=tag_set,
+            tag_keyword=self._normalize_search_tag_keyword(data.get("tag_keyword")),
             page=int(data.get("page", 1) or 1),
             page_size=int(data.get("page_size", 25) or 25),
             sort=str(data.get("sort", "id_desc") or "id_desc"),
@@ -564,6 +565,12 @@ class ImageCatalogApi:
 
         model = str(value or "").strip()
         return model or None
+
+    def _normalize_search_tag_keyword(self, value: object) -> str | None:
+        """タグ部分一致検索キーワードを小文字化し、空文字ならNoneへ正規化する。"""
+
+        keyword = str(value or "").strip().lower()
+        return keyword or None
 
     def _normalize_tag_hash_condition(self, data: dict[str, Any]) -> tuple[str | None, str | None]:
         """タグ構成検索条件をhashとtag_setが揃う場合だけ有効化する。"""

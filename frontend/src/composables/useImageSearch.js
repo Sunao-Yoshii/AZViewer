@@ -25,6 +25,7 @@ export function useImageSearch({ pushToast, setStatus, loading }) {
     tagHash: null,
     tagSet: null,
     duplicateTagNames: null,
+    tag_keyword: '',
     page: 1,
     page_size: 25,
     sort: 'id_desc',
@@ -52,6 +53,7 @@ export function useImageSearch({ pushToast, setStatus, loading }) {
       model: merged.model || null,
       tag_hash: merged.tagHash || null,
       tag_set: merged.tagSet || null,
+      tag_keyword: String(merged.tag_keyword ?? '').trim() || null,
       page: merged.page,
       page_size: merged.page_size,
       sort: merged.sort,
@@ -84,6 +86,7 @@ export function useImageSearch({ pushToast, setStatus, loading }) {
       tagHash: appliedPayload.tag_hash ?? null,
       tagSet: appliedPayload.tag_set ?? null,
       duplicateTagNames: filters.value.duplicateTagNames ?? null,
+      tag_keyword: appliedPayload.tag_keyword ?? '',
       page: data.page ?? appliedPayload.page ?? 1,
       page_size: data.page_size ?? appliedPayload.page_size ?? 25,
       sort: appliedPayload.sort ?? 'id_desc',
@@ -118,6 +121,7 @@ export function useImageSearch({ pushToast, setStatus, loading }) {
       tagHash: item.hash,
       tagSet: item.tagSet,
       duplicateTagNames: item.tagNames,
+      tag_keyword: '',
     }
     return await executeSearch({ page: 1 }, true)
   }

@@ -326,6 +326,19 @@ function applyModelSearchFailure(message = 'モデル一覧を取得できませ
     </div>
 
     <div>
+      <label class="form-label small fw-semibold" for="searchTagKeyword">タグ部分一致</label>
+      <input
+        id="searchTagKeyword"
+        v-model="filters.tag_keyword"
+        class="form-control form-control-sm"
+        type="text"
+        placeholder="例: hair"
+        :disabled="isBusy"
+      />
+      <div class="form-text">入力した文字列を含むタグが付いた画像を検索します。</div>
+    </div>
+
+    <div>
       <div class="d-flex justify-content-between align-items-center mb-1">
         <span class="form-label small fw-semibold mb-0">モデル</span>
         <button
