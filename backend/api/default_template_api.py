@@ -28,7 +28,7 @@ class DefaultTemplateApi:
             message="StableDiffusion WebUI 特化画像ビューワー.",
             data={
                 "name": "AZViewer",
-                "version": "1.2.1",
+                "version": "1.2.2",
                 "description": "StableDiffusion WebUI 特化画像ビューワー.",
             },
         ).to_dict()
