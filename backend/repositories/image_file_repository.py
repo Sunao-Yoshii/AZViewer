@@ -884,11 +884,12 @@ class ImageFileRepository:
             f"""
             SELECT
                 tag_image_link.image_file_id,
+                tag.id,
                 tag.name
             FROM tag_image_link
             INNER JOIN tag ON tag.id = tag_image_link.tag_id
             WHERE tag_image_link.image_file_id IN ({placeholders})
-            ORDER BY tag_image_link.image_file_id ASC, tag.name ASC
+            ORDER BY tag_image_link.image_file_id ASC, tag.id ASC
             """,
             image_ids,
         ).fetchall()
@@ -923,6 +924,24 @@ class ImageFileRepository:
             self._connection.execute("BEGIN")
             self.replace_tags(image_file_id, tags)
             self._connection.commit()
+        except Exception:
+            self._connection.rollback()
+            raise
+
+    def merge_tags_atomic(self, image_file_id: int, tags: list[str]) -> bool:
+        """既存タグを保持して指定タグを追加し、変更有無を返す。"""
+
+        try:
+            self._connection.execute("BEGIN")
+            existing_tags = self.find_tags_by_image_ids([image_file_id]).get(image_file_id, [])
+            merged_tags = self._merge_tag_names(existing_tags, tags)
+            if merged_tags == existing_tags:
+                self._connection.rollback()
+                return False
+
+            self.replace_tags(image_file_id, merged_tags)
+            self._connection.commit()
+            return True
         except Exception:
             self._connection.rollback()
             raise
@@ -1227,6 +1246,18 @@ class ImageFileRepository:
         if row is None:
             raise RuntimeError(f"Tag could not be created: {tag_name}")
         return int(row["id"])
+
+    def _merge_tag_names(self, existing_tags: list[str], tags: list[str]) -> list[str]:
+        """既存順を保ったまま追加タグを統合する。"""
+
+        merged_tags: list[str] = []
+        seen: set[str] = set()
+        for tag in [*existing_tags, *tags]:
+            if tag in seen:
+                continue
+            seen.add(tag)
+            merged_tags.append(tag)
+        return merged_tags
 
     def _find_tag_by_id(self, tag_id: int):
         """IDに一致するタグ行を取得する。"""

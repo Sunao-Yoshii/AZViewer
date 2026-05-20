@@ -1,8 +1,11 @@
 import { reactive } from 'vue'
 import {
+  bulkAddTags,
   bulkUpdateImageFileAttributes,
   deleteImageFile,
   deleteImageFilesWithPhysicalFiles,
+  exportSelectedImageTags,
+  importCaptionTags as importCaptionTagsApi,
   moveImageFilesToFolder,
   selectFolderDialog,
   updateImageFileDetail,
@@ -83,6 +86,63 @@ function pushMoveResultToast(pushToast, result, targetCount) {
   })
 }
 
+function buildTagCaptionExportConfirmMessage(count) {
+  return [
+    `選択した ${count} 件の画像について、画像に設定されているタグを同名の .txt ファイルとして出力します。`,
+    '',
+    '出力先は各画像ファイルと同じフォルダです。',
+    '既に .txt ファイルが存在する場合は上書きされます。',
+    'タグが設定されていない画像はスキップされます。',
+    '',
+    '実行しますか？',
+  ].join('\n')
+}
+
+function pushTagCaptionExportResultToast(pushToast, result, targetCount) {
+  const data = result?.data ?? {}
+  const failedCount = data.failedCount ?? 0
+  const prefix = failedCount > 0
+    ? 'タグ出力が完了しましたが、一部失敗しました。'
+    : 'タグ出力が完了しました。'
+
+  pushToast({
+    type: failedCount > 0 ? 'warning' : 'success',
+    message: `${prefix}対象: ${data.targetCount ?? targetCount} 件 / 出力: ${data.exportedCount ?? 0} 件 / スキップ: ${data.skippedCount ?? 0} 件 / 失敗: ${failedCount} 件`,
+  })
+}
+
+function buildCaptionTagImportConfirmMessage(count) {
+  return [
+    `選択した ${count} 件の画像について、画像と同名の caption .txt を読み込み、タグとして追加登録します。`,
+    '',
+    '既存タグは保持されます。',
+    '同名 .txt が存在しない画像、タグが取得できない画像はスキップされます。',
+    '',
+    '実行しますか？',
+  ].join('\n')
+}
+
+function pushCaptionTagImportResultToast(pushToast, result, targetCount) {
+  const data = result?.data ?? {}
+  const failedCount = data.failedCount ?? 0
+  const prefix = failedCount > 0
+    ? 'キャプションタグ読み込みが完了しましたが、一部失敗しました。'
+    : 'キャプションタグ読み込みが完了しました。'
+
+  pushToast({
+    type: failedCount > 0 ? 'warning' : 'success',
+    message: `${prefix}対象: ${data.targetCount ?? targetCount} 件 / 更新: ${data.updatedCount ?? 0} 件 / スキップ: ${data.skippedCount ?? 0} 件 / 失敗: ${failedCount} 件`,
+  })
+}
+
+function pushBulkTagAddResultToast(pushToast, result, targetCount) {
+  const data = result?.data ?? {}
+  pushToast({
+    type: (data.failedCount ?? 0) > 0 ? 'warning' : 'success',
+    message: `一括タグ追加が完了しました。対象: ${data.targetCount ?? targetCount} 件 / 更新: ${data.updatedCount ?? 0} 件 / スキップ: ${data.skippedCount ?? 0} 件 / 失敗: ${data.failedCount ?? 0} 件`,
+  })
+}
+
 function createBulkAttributeEditForm() {
   return {
     ratingEnabled: false,
@@ -146,6 +206,11 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     isSaving: false,
     form: createBulkAttributeEditForm(),
   })
+  const bulkTagAddModal = reactive({
+    show: false,
+    tagsText: '',
+    isSaving: false,
+  })
 
   function resetBulkAttributeEditForm() {
     bulkAttributeEditModal.form = createBulkAttributeEditForm()
@@ -183,6 +248,31 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     bulkAttributeEditModal.show = false
     bulkAttributeEditModal.isSaving = false
     resetBulkAttributeEditForm()
+  }
+
+  function openBulkTagAddModal({ ids }) {
+    const targetIds = [...(ids ?? [])]
+
+    if (targetIds.length === 0) {
+      pushToast({
+        type: 'warning',
+        message: 'タグを追加する画像を選択してください。',
+      })
+      return
+    }
+
+    bulkTagAddModal.tagsText = ''
+    bulkTagAddModal.show = true
+  }
+
+  function closeBulkTagAddModal() {
+    bulkTagAddModal.show = false
+    bulkTagAddModal.tagsText = ''
+    bulkTagAddModal.isSaving = false
+  }
+
+  function updateBulkTagAddText(value) {
+    bulkTagAddModal.tagsText = value
   }
 
   function updateBulkAttributeEditForm({ key, value }) {
@@ -304,6 +394,98 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     }
   }
 
+  async function exportSelectedTags({ ids, clearSelection }) {
+    const targetIds = [...(ids ?? [])]
+    if (targetIds.length === 0) {
+      return
+    }
+
+    if (!window.confirm(buildTagCaptionExportConfirmMessage(targetIds.length))) {
+      return
+    }
+
+    loading?.showLoading(
+      'タグを出力中',
+      'タグ出現頻度を集計し、caption ファイルを出力しています...'
+    )
+
+    try {
+      const result = await exportSelectedImageTags({ ids: targetIds })
+      if (!result?.success) {
+        pushToast({ type: 'danger', message: result?.message || 'タグ出力に失敗しました。' })
+        return
+      }
+
+      pushTagCaptionExportResultToast(pushToast, result, targetIds.length)
+      clearSelection?.()
+    } catch (error) {
+      pushToast({ type: 'danger', message: 'タグ出力に失敗しました。' })
+    } finally {
+      loading?.hideLoading()
+    }
+  }
+
+  async function importCaptionTags({ ids, refresh: refreshSelected, clearSelection }) {
+    const targetIds = [...(ids ?? [])]
+    if (targetIds.length === 0) {
+      return
+    }
+
+    if (!window.confirm(buildCaptionTagImportConfirmMessage(targetIds.length))) {
+      return
+    }
+
+    loading?.showLoading(
+      'キャプションタグを読み込み中',
+      '選択画像と同名の caption ファイルからタグを追加しています...'
+    )
+
+    try {
+      const result = await importCaptionTagsApi({ ids: targetIds })
+      if (!result?.success) {
+        pushToast({ type: 'danger', message: result?.message || 'キャプションタグ読み込みに失敗しました。' })
+        return
+      }
+
+      pushCaptionTagImportResultToast(pushToast, result, targetIds.length)
+      clearSelection?.()
+      await refreshSelected?.()
+    } catch (error) {
+      pushToast({ type: 'danger', message: 'キャプションタグ読み込みに失敗しました。' })
+    } finally {
+      loading?.hideLoading()
+    }
+  }
+
+  async function saveBulkTagAdd({ ids, refresh: refreshSelected, clearSelection }) {
+    const targetIds = [...(ids ?? [])]
+    if (targetIds.length === 0 || !bulkTagAddModal.tagsText.trim()) {
+      pushToast({ type: 'warning', message: '追加するタグを入力してください。' })
+      return
+    }
+
+    bulkTagAddModal.isSaving = true
+    loading?.showLoading('タグを一括追加中', '選択画像へ指定タグを追加しています...')
+
+    try {
+      const result = await bulkAddTags({ ids: targetIds, tagsText: bulkTagAddModal.tagsText })
+      if (!result?.success) {
+        pushToast({ type: 'warning', message: result?.message || '一括タグ追加に失敗しました。' })
+        return
+      }
+
+      pushBulkTagAddResultToast(pushToast, result, targetIds.length)
+      closeBulkTagAddModal()
+      clearSelection?.()
+      await refreshSelected?.()
+    } catch (error) {
+      pushToast({ type: 'danger', message: '一括タグ追加に失敗しました。' })
+    } finally {
+      bulkTagAddModal.isSaving = false
+      loading?.hideLoading()
+    }
+  }
+
   async function handleSaveDetail(payload) {
     const result = await updateImageFileDetail(payload)
     if (!result.success) {
@@ -315,13 +497,20 @@ export function useImageMutations({ pushToast, refresh, loading }) {
 
   return {
     bulkAttributeEditModal,
+    bulkTagAddModal,
     closeBulkAttributeEditModal,
+    closeBulkTagAddModal,
     deleteSelectedImages,
+    exportSelectedTags,
     handleDelete,
     handleSaveDetail,
+    importCaptionTags,
     moveSelectedImages,
     openBulkAttributeEditModal,
+    openBulkTagAddModal,
     saveBulkAttributeEdit,
+    saveBulkTagAdd,
     updateBulkAttributeEditForm,
+    updateBulkTagAddText,
   }
 }

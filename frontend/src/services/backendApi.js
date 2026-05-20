@@ -84,6 +84,18 @@ export async function moveImageFilesToFolder(payload) {
   return await callBackendApi('move_image_files_to_folder', payload)
 }
 
+export async function exportSelectedImageTags(payload) {
+  return await callBackendApi('export_selected_image_tags', payload)
+}
+
+export async function importCaptionTags(payload) {
+  return await callBackendApi('import_caption_tags', payload)
+}
+
+export async function bulkAddTags(payload) {
+  return await callBackendApi('bulk_add_tags', payload)
+}
+
 export async function fetchLocalImage(path) {
   return await callBackendApi('fetchLocalImage', { path })
 }

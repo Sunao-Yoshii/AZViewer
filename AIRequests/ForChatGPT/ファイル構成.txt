@@ -1,12 +1,7 @@
 AZViewer/
-  .env.example
-  .gitignore
-  Pipfile
-  Pipfile.lock
+  build_windows.ps1
   backend/
-    __init__.py
     api/
-      __init__.py
       api_response.py
       app_api.py
       app_lifecycle_api.py
@@ -16,28 +11,26 @@ AZViewer/
       image_register_api.py
       os_operation_api.py
     db/
-      __init__.py
       connection_manager.py
     main.py
     models/
-      __init__.py
       image_file.py
     repositories/
-      __init__.py
       image_file_repository.py
     requirements.txt
     services/
-      __init__.py
+      bulk_tag_add_service.py
+      caption_tag_import_service.py
       dialog_service.py
       file_scan_service.py
       image_file_import_service.py
       image_metadata_service.py
       prompt_tag_import_service.py
       startup_cleanup_service.py
+      tag_caption_export_service.py
       tag_normalize_service.py
       thumbnail_cache_service.py
       wildcard_export_service.py
-  build_windows.ps1
   frontend/
     index.html
     package-lock.json
@@ -54,8 +47,11 @@ AZViewer/
           LoadingOverlay.vue
           pagination.vue
         form/
+          BulkAttributeEditModal.vue
+          BulkTagAddModal.vue
           DuplicateTagSetModal.vue
           FolderSearchModal.vue
+          MasterMaintenanceModal.vue
           ModelSearchModal.vue
           search_form.vue
           TagSearchModal.vue
@@ -85,6 +81,7 @@ AZViewer/
         useImageMutations.js
         useImageSearch.js
         useLoadingOverlay.js
+        useMasterMaintenance.js
         usePromptTagImport.js
         useToast.js
         useWildcardExport.js

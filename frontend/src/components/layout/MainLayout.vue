@@ -42,10 +42,13 @@ defineEmits([
   'search',
   'import-complete',
   'import-prompt-tags',
+  'import-caption-tags',
   'toggle-visible-selection',
   'delete-selected-images',
+  'export-selected-tags',
   'move-selected-images',
   'open-bulk-attribute-edit',
+  'open-bulk-tag-add',
   'open-wildcard-export',
   'open-duplicate-tag-sets',
   'open-master-maintenance',
@@ -68,10 +71,13 @@ defineEmits([
       :visible-count="visibleCount"
       :is-all-visible-selected="isAllVisibleSelected"
       @import-prompt-tags="$emit('import-prompt-tags')"
+      @import-caption-tags="$emit('import-caption-tags')"
       @toggle-visible-selection="$emit('toggle-visible-selection')"
       @delete-selected-images="$emit('delete-selected-images')"
+      @export-selected-tags="$emit('export-selected-tags')"
       @move-selected-images="$emit('move-selected-images')"
       @open-bulk-attribute-edit="$emit('open-bulk-attribute-edit')"
+      @open-bulk-tag-add="$emit('open-bulk-tag-add')"
       @open-wildcard-export="$emit('open-wildcard-export')"
       @open-duplicate-tag-sets="$emit('open-duplicate-tag-sets')"
       @open-master-maintenance="$emit('open-master-maintenance', $event)"

@@ -120,6 +120,11 @@ class AppApi:
 
         return self._image_catalog_api.move_image_files_to_folder(payload)
 
+    def export_selected_image_tags(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """指定レコードのタグを画像ごとのcaptionファイルへ出力する。"""
+
+        return self._image_catalog_api.export_selected_image_tags(payload)
+
     def fetchLocalImage(self, payload: dict[str, object]) -> dict[str, object]:
         """ローカル画像の本体を表示用データURLとして返す。"""
 
@@ -199,6 +204,16 @@ class AppApi:
         """タグ未登録画像へプロンプト由来タグを一括登録する。"""
 
         return self._image_catalog_api.import_prompt_tags(payload)
+
+    def import_caption_tags(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """指定画像と同名のcaptionファイルからタグを追加登録する。"""
+
+        return self._image_catalog_api.import_caption_tags(payload)
+
+    def bulk_add_tags(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """指定画像群へ同一タグを追加登録する。"""
+
+        return self._image_catalog_api.bulk_add_tags(payload)
 
     def export_wildcard_text(self, payload: dict[str, object] | None = None) -> dict[str, object]:
         """ワイルドカード出力テキストを保存または追記する。"""

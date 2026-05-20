@@ -23,13 +23,16 @@ defineProps({
 })
 
 defineEmits([
-  'import-prompt-tags',
-  'toggle-visible-selection',
-  'delete-selected-images',
-  'move-selected-images',
   'open-bulk-attribute-edit',
   'open-wildcard-export',
+  'export-selected-tags',
+  'delete-selected-images',
+  'move-selected-images',
+  'import-prompt-tags',
+  'import-caption-tags',
+  'open-bulk-tag-add',
   'open-duplicate-tag-sets',
+  'toggle-visible-selection',
   'open-master-maintenance',
 ])
 </script>
@@ -55,46 +58,122 @@ defineEmits([
         >
           選択画像を一括編集 ({{ selectedCount }})
         </button>
-        <button
-          type="button"
-          class="btn btn-outline-success btn-sm"
-          :disabled="isBusy || selectedCount === 0"
-          @click="$emit('open-wildcard-export')"
-        >
-          ワイルドカード出力 ({{ selectedCount }})
-        </button>
-        <button
-          type="button"
-          class="btn btn-success btn-sm"
-          :disabled="isBusy || selectedCount === 0"
-          @click="$emit('move-selected-images')"
-        >
-          ファイルを移動 ({{ selectedCount }})
-        </button>
-        <button
-          type="button"
-          class="btn btn-danger btn-sm"
-          :disabled="isBusy || selectedCount === 0"
-          @click="$emit('delete-selected-images')"
-        >
-          選択画像を削除 ({{ selectedCount }})
-        </button>
-        <button
-          type="button"
-          class="btn btn-outline-primary btn-sm"
-          :disabled="isBusy"
-          @click="$emit('import-prompt-tags')"
-        >
-          プロンプトの読み取り
-        </button>
-        <button
-          type="button"
-          class="btn btn-outline-secondary btn-sm"
-          :disabled="isBusy"
-          @click="$emit('open-duplicate-tag-sets')"
-        >
-          重複タグ構成の検索
-        </button>
+        <div class="dropdown">
+          <button
+            class="btn btn-outline-success btn-sm dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            :disabled="isBusy || selectedCount === 0"
+          >
+            アウトプット ({{ selectedCount }})
+          </button>
+          <ul class="dropdown-menu">
+            <li>
+              <button
+                type="button"
+                class="dropdown-item"
+                :disabled="isBusy || selectedCount === 0"
+                @click="$emit('open-wildcard-export')"
+              >
+                ワイルドカード出力
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="dropdown-item"
+                :disabled="isBusy || selectedCount === 0"
+                @click="$emit('export-selected-tags')"
+              >
+                タグ出力
+              </button>
+            </li>
+          </ul>
+        </div>
+        <div class="dropdown">
+          <button
+            class="btn btn-outline-success btn-sm dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            :disabled="isBusy || selectedCount === 0"
+          >
+            ファイル操作 ({{ selectedCount }})
+          </button>
+          <ul class="dropdown-menu">
+            <li>
+              <button
+                type="button"
+                class="dropdown-item"
+                :disabled="isBusy || selectedCount === 0"
+                @click="$emit('move-selected-images')"
+              >
+                ファイルを移動
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="dropdown-item text-danger"
+                :disabled="isBusy || selectedCount === 0"
+                @click="$emit('delete-selected-images')"
+              >
+                選択画像を削除
+              </button>
+            </li>
+          </ul>
+        </div>
+        <div class="dropdown">
+          <button
+            class="btn btn-outline-primary btn-sm dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            :disabled="isBusy"
+          >
+            タグ操作
+          </button>
+          <ul class="dropdown-menu">
+            <li>
+              <button
+                type="button"
+                class="dropdown-item"
+                :disabled="isBusy"
+                @click="$emit('import-prompt-tags')"
+              >
+                プロンプトの読み取り
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="dropdown-item"
+                :disabled="isBusy || selectedCount === 0"
+                @click="$emit('import-caption-tags')"
+              >
+                キャプションタグ読み込み
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="dropdown-item"
+                :disabled="isBusy || selectedCount === 0"
+                @click="$emit('open-bulk-tag-add')"
+              >
+                一括タグ追加
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="dropdown-item"
+                :disabled="isBusy"
+                @click="$emit('open-duplicate-tag-sets')"
+              >
+                重複タグ構成の検索
+              </button>
+            </li>
+          </ul>
+        </div>
         <div class="dropdown">
           <button
             class="btn btn-outline-secondary btn-sm dropdown-toggle"

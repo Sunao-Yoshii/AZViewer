@@ -8,7 +8,9 @@ from typing import Any
 
 from backend.repositories import ImageFileRepository
 from backend.models import (
+    BulkTagAddResult,
     BulkAttributeUpdateResult,
+    CaptionTagImportResult,
     FileMoveFailure,
     FileMoveResult,
     ImageFileListItem,
@@ -16,12 +18,16 @@ from backend.models import (
     PhysicalDeleteFailure,
     PhysicalDeleteResult,
     PromptTagImportResult,
+    TagCaptionExportResult,
     WildcardExportResult,
 )
 from backend.services import (
+    BulkTagAddService,
+    CaptionTagImportService,
     DialogService,
     ImageMetadataService,
     PromptTagImportService,
+    TagCaptionExportService,
     TagNormalizeService,
     ThumbnailCacheService,
     WildcardExportService,
@@ -50,6 +56,7 @@ class ImageCatalogApi:
         self._tag_normalize_service = tag_normalize_service or TagNormalizeService()
         self._dialog_service = dialog_service
         self._repository: ImageFileRepository | None = None
+        self._tag_caption_export_service: TagCaptionExportService | None = None
         self._wildcard_export_service: WildcardExportService | None = None
 
     def search_image_files(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -242,6 +249,46 @@ class ImageCatalogApi:
                 success=False,
                 message="画像ファイルの移動に失敗しました。",
                 data=self._empty_file_move_data(),
+            ).to_dict()
+
+    def export_selected_image_tags(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定レコードのタグを画像ごとのcaptionファイルへ出力する。"""
+
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            record_ids = self._normalize_record_ids(data.get("ids"))
+            if not record_ids:
+                return ApiResponse(
+                    success=False,
+                    message="タグ出力対象が指定されていません。",
+                    data=self._empty_tag_caption_export_data(),
+                ).to_dict()
+
+            repository = self._get_repository()
+            items = repository.find_by_ids(record_ids)
+            if not items:
+                return ApiResponse(
+                    success=True,
+                    message="タグ出力対象の画像はありませんでした。",
+                    data=self._empty_tag_caption_export_data(),
+                ).to_dict()
+
+            tags_by_image_id = repository.find_tags_by_image_ids([item.id for item in items])
+            result = self._get_tag_caption_export_service().export(
+                items=items,
+                tags_by_image_id=tags_by_image_id,
+            )
+            message = (
+                "タグ出力が完了しましたが、一部失敗しました。"
+                if result.failed_count > 0
+                else "タグ出力が完了しました。"
+            )
+            return ApiResponse(success=True, message=message, data=result.to_api_data()).to_dict()
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="タグ出力に失敗しました。",
+                data=self._empty_tag_caption_export_data(),
             ).to_dict()
 
     def fetchLocalImage(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -579,6 +626,73 @@ class ImageCatalogApi:
             data=result.to_api_data(),
         ).to_dict()
 
+    def import_caption_tags(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定画像と同名のcaptionファイルからタグを追加登録する。"""
+
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            record_ids = self._normalize_record_ids(data.get("ids"))
+            if not record_ids:
+                return ApiResponse(
+                    success=False,
+                    message="captionタグ読み込み対象が指定されていません。",
+                    data=self._empty_caption_tag_import_data(),
+                ).to_dict()
+
+            result = CaptionTagImportService(
+                self._get_repository(),
+                self._tag_normalize_service,
+            ).import_caption_tags(record_ids)
+            message = (
+                "キャプションタグ読み込みが完了しましたが、一部失敗しました。"
+                if result.failed_count > 0
+                else "キャプションタグ読み込みが完了しました。"
+            )
+            return ApiResponse(success=True, message=message, data=result.to_api_data()).to_dict()
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="キャプションタグ読み込みに失敗しました。",
+                data=self._empty_caption_tag_import_data(),
+            ).to_dict()
+
+    def bulk_add_tags(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定画像群へ同一タグを追加登録する。"""
+
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            record_ids = self._normalize_record_ids(data.get("ids"))
+            if not record_ids:
+                return ApiResponse(
+                    success=False,
+                    message="タグ追加対象が指定されていません。",
+                    data=self._empty_bulk_tag_add_data(),
+                ).to_dict()
+
+            tags_text = str(data.get("tagsText") or "")
+            result = BulkTagAddService(
+                self._get_repository(),
+                self._tag_normalize_service,
+            ).bulk_add_tags(record_ids, tags_text)
+            message = (
+                "一括タグ追加が完了しましたが、一部失敗しました。"
+                if result.failed_count > 0
+                else "一括タグ追加が完了しました。"
+            )
+            return ApiResponse(success=True, message=message, data=result.to_api_data()).to_dict()
+        except ValueError as exc:
+            return ApiResponse(
+                success=False,
+                message=str(exc),
+                data=self._empty_bulk_tag_add_data(),
+            ).to_dict()
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="一括タグ追加に失敗しました。",
+                data=self._empty_bulk_tag_add_data(),
+            ).to_dict()
+
     def export_wildcard_text(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """ワイルドカード出力テキストを保存または追記する。"""
 
@@ -634,6 +748,13 @@ class ImageCatalogApi:
 
         self._wildcard_export_service = WildcardExportService(self._dialog_service)
         return self._wildcard_export_service
+
+    def _get_tag_caption_export_service(self) -> TagCaptionExportService:
+        """タグcaption出力サービスを返す。"""
+
+        if self._tag_caption_export_service is None:
+            self._tag_caption_export_service = TagCaptionExportService()
+        return self._tag_caption_export_service
 
     def _normalize_nullable_string(self, value: object) -> str | None:
         """未指定文字列をNoneへ正規化する。"""
@@ -904,6 +1025,39 @@ class ImageCatalogApi:
         return BulkAttributeUpdateResult(
             target_count=0,
             updated_count=0,
+        ).to_api_data()
+
+    def _empty_tag_caption_export_data(self) -> dict[str, object]:
+        """タグcaption出力API用の空結果データを返す。"""
+
+        return TagCaptionExportResult(
+            target_count=0,
+            exported_count=0,
+            skipped_count=0,
+            failed_count=0,
+            failed_files=[],
+        ).to_api_data()
+
+    def _empty_caption_tag_import_data(self) -> dict[str, object]:
+        """captionタグ読み込みAPI用の空結果データを返す。"""
+
+        return CaptionTagImportResult(
+            target_count=0,
+            updated_count=0,
+            skipped_count=0,
+            failed_count=0,
+            failed_files=[],
+        ).to_api_data()
+
+    def _empty_bulk_tag_add_data(self) -> dict[str, object]:
+        """一括タグ追加API用の空結果データを返す。"""
+
+        return BulkTagAddResult(
+            target_count=0,
+            updated_count=0,
+            skipped_count=0,
+            failed_count=0,
+            failed_files=[],
         ).to_api_data()
 
     def _delete_physical_files_and_records(

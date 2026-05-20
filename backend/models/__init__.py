@@ -1,5 +1,9 @@
 from .image_file import (
     BulkAttributeUpdateResult,
+    BulkTagAddFailure,
+    BulkTagAddResult,
+    CaptionTagImportFailure,
+    CaptionTagImportResult,
     DuplicateTagSetItem,
     FileMoveFailure,
     FileMoveResult,
@@ -18,12 +22,18 @@ from .image_file import (
     PromptTagImportFailure,
     PromptTagImportResult,
     SearchImageFilesResult,
+    TagCaptionExportFailure,
+    TagCaptionExportResult,
     TagListItem,
     WildcardExportResult,
 )
 
 __all__ = [
     "BulkAttributeUpdateResult",
+    "BulkTagAddFailure",
+    "BulkTagAddResult",
+    "CaptionTagImportFailure",
+    "CaptionTagImportResult",
     "DuplicateTagSetItem",
     "FileMoveFailure",
     "FileMoveResult",
@@ -42,6 +52,8 @@ __all__ = [
     "PromptTagImportFailure",
     "PromptTagImportResult",
     "SearchImageFilesResult",
+    "TagCaptionExportFailure",
+    "TagCaptionExportResult",
     "TagListItem",
     "WildcardExportResult",
 ]

@@ -65,6 +65,135 @@ class BulkAttributeUpdateResult:
 
 
 @dataclass(frozen=True)
+class TagCaptionExportFailure:
+    """タグcaption出力で失敗した画像1件分を表す。"""
+
+    id: int
+    path: str
+    reason: str
+
+    def to_dict(self) -> dict[str, object]:
+        """API返却用の辞書形式へ変換する。"""
+
+        return {
+            "id": self.id,
+            "path": self.path,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
+class TagCaptionExportResult:
+    """選択画像タグcaption出力処理の結果を表す。"""
+
+    target_count: int
+    exported_count: int
+    skipped_count: int
+    failed_count: int
+    failed_files: list[TagCaptionExportFailure]
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "targetCount": self.target_count,
+            "exportedCount": self.exported_count,
+            "skippedCount": self.skipped_count,
+            "failedCount": self.failed_count,
+            "failedFiles": [
+                item.to_dict()
+                for item in self.failed_files[:20]
+            ],
+        }
+
+
+@dataclass(frozen=True)
+class CaptionTagImportFailure:
+    """captionタグ読み込みで失敗した画像1件分を表す。"""
+
+    id: int
+    path: str
+    reason: str
+
+    def to_dict(self) -> dict[str, object]:
+        """API返却用の辞書形式へ変換する。"""
+
+        return {
+            "id": self.id,
+            "path": self.path,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
+class CaptionTagImportResult:
+    """captionタグ読み込み処理の結果を表す。"""
+
+    target_count: int
+    updated_count: int
+    skipped_count: int
+    failed_count: int
+    failed_files: list[CaptionTagImportFailure]
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "targetCount": self.target_count,
+            "updatedCount": self.updated_count,
+            "skippedCount": self.skipped_count,
+            "failedCount": self.failed_count,
+            "failedFiles": [
+                item.to_dict()
+                for item in self.failed_files[:20]
+            ],
+        }
+
+
+@dataclass(frozen=True)
+class BulkTagAddFailure:
+    """一括タグ追加で失敗した画像1件分を表す。"""
+
+    id: int
+    path: str
+    reason: str
+
+    def to_dict(self) -> dict[str, object]:
+        """API返却用の辞書形式へ変換する。"""
+
+        return {
+            "id": self.id,
+            "path": self.path,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
+class BulkTagAddResult:
+    """一括タグ追加処理の結果を表す。"""
+
+    target_count: int
+    updated_count: int
+    skipped_count: int
+    failed_count: int
+    failed_files: list[BulkTagAddFailure]
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "targetCount": self.target_count,
+            "updatedCount": self.updated_count,
+            "skippedCount": self.skipped_count,
+            "failedCount": self.failed_count,
+            "failedFiles": [
+                item.to_dict()
+                for item in self.failed_files[:20]
+            ],
+        }
+
+
+@dataclass(frozen=True)
 class TagListItem:
     """タグ検索候補の1件分データを表す。"""
 

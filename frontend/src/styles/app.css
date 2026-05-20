@@ -28,6 +28,14 @@ body {
   gap: 0.5rem;
 }
 
+.app-header-actions .dropdown-menu {
+  font-size: 0.875rem;
+}
+
+.dropdown-item.text-danger:active {
+  color: #fff;
+}
+
 .app-footer {
   display: flex;
   align-items: center;
@@ -471,6 +479,11 @@ body {
 .bulk-attribute-edit-title {
   font-weight: 600;
   margin-bottom: 0.5rem;
+}
+
+.bulk-tag-add-textarea {
+  resize: vertical;
+  min-height: 9rem;
 }
 
 .image-detail-body {

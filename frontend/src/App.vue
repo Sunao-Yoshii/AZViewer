@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import BulkAttributeEditModal from './components/form/BulkAttributeEditModal.vue'
+import BulkTagAddModal from './components/form/BulkTagAddModal.vue'
 import DuplicateTagSetModal from './components/form/DuplicateTagSetModal.vue'
 import MasterMaintenanceModal from './components/form/MasterMaintenanceModal.vue'
 import WildcardExportModal from './components/form/WildcardExportModal.vue'
@@ -75,6 +76,7 @@ const imageMutations = useImageMutations({
 })
 const {
   deleteSelectedImages,
+  exportSelectedTags,
   handleDelete,
   handleSaveDetail,
   moveSelectedImages,
@@ -188,10 +190,39 @@ async function handleSaveBulkAttributeEdit() {
   })
 }
 
+async function handleImportCaptionTags() {
+  await imageMutations.importCaptionTags({
+    ids: selectedImageIds.value,
+    refresh: executeSearch,
+    clearSelection,
+  })
+}
+
+function handleOpenBulkTagAdd() {
+  imageMutations.openBulkTagAddModal({
+    ids: selectedImageIds.value,
+  })
+}
+
+async function handleSaveBulkTagAdd() {
+  await imageMutations.saveBulkTagAdd({
+    ids: selectedImageIds.value,
+    refresh: executeSearch,
+    clearSelection,
+  })
+}
+
 function handleOpenWildcardExport() {
   wildcardExport.openWildcardExportModal({
     ids: selectedImageIds.value,
     currentItems: searchResult.value.items,
+  })
+}
+
+async function handleExportSelectedTags() {
+  await exportSelectedTags({
+    ids: selectedImageIds.value,
+    clearSelection,
   })
 }
 
@@ -239,11 +270,14 @@ onBeforeUnmount(() => {
     @search="handleSearchWithSelectionClear"
     @import-complete="handleImportCompleteWithSelectionClear"
     @import-prompt-tags="handleImportPromptTags"
+    @import-caption-tags="handleImportCaptionTags"
     @toggle-visible-selection="handleToggleVisibleSelection"
     @delete-selected-images="handleDeleteSelectedImages"
     @move-selected-images="handleMoveSelectedImages"
     @open-bulk-attribute-edit="handleOpenBulkAttributeEdit"
+    @open-bulk-tag-add="handleOpenBulkTagAdd"
     @open-wildcard-export="handleOpenWildcardExport"
+    @export-selected-tags="handleExportSelectedTags"
     @open-duplicate-tag-sets="duplicateTagSetSearch.openDuplicateTagSetModal"
     @open-master-maintenance="masterMaintenance.openMasterMaintenance"
   >
@@ -298,6 +332,15 @@ onBeforeUnmount(() => {
     @close="imageMutations.closeBulkAttributeEditModal"
     @update-form="imageMutations.updateBulkAttributeEditForm"
     @save="handleSaveBulkAttributeEdit"
+  />
+  <BulkTagAddModal
+    :show="imageMutations.bulkTagAddModal.show"
+    :selected-count="selectedCount"
+    :tags-text="imageMutations.bulkTagAddModal.tagsText"
+    :is-saving="imageMutations.bulkTagAddModal.isSaving"
+    @close="imageMutations.closeBulkTagAddModal"
+    @update-tags-text="imageMutations.updateBulkTagAddText"
+    @save="handleSaveBulkTagAdd"
   />
   <MasterMaintenanceModal
     :show="masterMaintenance.masterMaintenanceModal.show"
