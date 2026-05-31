@@ -115,6 +115,11 @@ class AppApi:
 
         return self._image_catalog_api.move_image_files_to_trash(payload)
 
+    def rename_image_file(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """指定レコードの実ファイル名を変更する。"""
+
+        return self._image_catalog_api.rename_image_file(payload)
+
     def move_image_files_to_folder(self, payload: dict[str, object]) -> dict[str, object]:
         """指定レコードの実ファイルを指定フォルダへ一括移動する。"""
 

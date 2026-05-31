@@ -819,6 +819,27 @@ class ImageFileRepository:
             self._connection.rollback()
             raise
 
+    def update_file_identity(self, record_id: int, filename: str, path: str, folder: str) -> int:
+        """指定IDのファイル名、パス、フォルダ名を更新する。"""
+
+        try:
+            cursor = self._connection.execute(
+                """
+                UPDATE image_file_data
+                SET
+                    filename = ?,
+                    path = ?,
+                    folder = ?
+                WHERE id = ?
+                """,
+                (filename, path, folder, record_id),
+            )
+            self._connection.commit()
+            return cursor.rowcount
+        except Exception:
+            self._connection.rollback()
+            raise
+
     def bulk_update_attributes(self, record_ids: list[int], updates: dict | None) -> int:
         """指定ID群の許可された属性だけを一括更新し、更新件数を返す。"""
 

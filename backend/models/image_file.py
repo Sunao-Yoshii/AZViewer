@@ -521,6 +521,26 @@ class TrashMoveResult:
 
 
 @dataclass(frozen=True)
+class ImageRenameResult:
+    """画像ファイル名変更処理結果を表す。"""
+
+    id: int
+    filename: str
+    path: str
+    folder: str
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "id": self.id,
+            "filename": self.filename,
+            "path": self.path,
+            "folder": self.folder,
+        }
+
+
+@dataclass(frozen=True)
 class FileMoveFailure:
     """ファイル移動で失敗した画像1件分を表す。"""
 

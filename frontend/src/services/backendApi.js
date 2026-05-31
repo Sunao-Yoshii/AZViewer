@@ -84,6 +84,10 @@ export async function moveImageFilesToTrash(payload) {
   return await callBackendApi('move_image_files_to_trash', payload)
 }
 
+export async function renameImageFile(payload) {
+  return await callBackendApi('rename_image_file', payload)
+}
+
 export async function exportSelectedImageTags(payload) {
   return await callBackendApi('export_selected_image_tags', payload)
 }

@@ -15,12 +15,17 @@ defineProps({
     type: Array,
     default: () => [],
   },
+  editingImageId: {
+    type: Number,
+    default: null,
+  },
 })
 
 defineEmits([
   'change-page',
   'change-page-size',
   'change-sort',
+  'edit-finished',
   'open-detail',
   'save-detail',
   'selection-change',
@@ -85,6 +90,8 @@ const pageSizeOptions = [25, 50, 75, 100]
         :item="item"
         :is-searching="isSearching"
         :selected="selectedImageIds.includes(item.id)"
+        :editing-image-id="editingImageId"
+        @edit-finished="$emit('edit-finished', $event)"
         @open-detail="$emit('open-detail', $event)"
         @save-detail="$emit('save-detail', $event)"
         @selection-change="$emit('selection-change', $event)"

@@ -16,6 +16,7 @@ from backend.models import (
     FileMoveFailure,
     FileMoveResult,
     ImageFileListItem,
+    ImageRenameResult,
     MasterMaintenanceSearchResult,
     PromptTagImportResult,
     TagCaptionExportResult,
@@ -216,6 +217,31 @@ class ImageCatalogApi:
                 success=False,
                 message="ごみ箱への移動に失敗しました。",
                 data=self._empty_trash_move_data(),
+            ).to_dict()
+
+    def rename_image_file(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定レコードの実ファイル名とDB登録情報を変更する。"""
+
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            record_id = self._normalize_required_record_id(data.get("id"))
+            filename = self._normalize_rename_filename(data.get("filename"))
+            repository = self._get_repository()
+            item = self._find_single_item(repository, record_id)
+            result = self._rename_file_and_update_record(repository, item, filename)
+            return ApiResponse(
+                success=True,
+                message="ファイル名を変更しました。",
+                data=result.to_api_data(),
+            ).to_dict()
+        except ValueError as exc:
+            return ApiResponse(success=False, message=str(exc), data=None).to_dict()
+        except Exception:
+            LOGGER.exception("Failed to rename image file.")
+            return ApiResponse(
+                success=False,
+                message="ファイル名を変更できませんでした。",
+                data=None,
             ).to_dict()
 
     def move_image_files_to_folder(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -938,6 +964,34 @@ class ImageCatalogApi:
             record_ids.append(record_id)
         return record_ids
 
+    def _normalize_required_record_id(self, value: object) -> int:
+        """必須レコードIDを正の整数として検証する。"""
+
+        try:
+            record_id = int(value)
+        except (TypeError, ValueError):
+            raise ValueError("id が指定されていません。")
+
+        if record_id <= 0:
+            raise ValueError("id が不正です。")
+        return record_id
+
+    def _normalize_rename_filename(self, value: object) -> str:
+        """リネーム用ファイル名を検証して正規化する。"""
+
+        filename = str(value or "").strip()
+        if not filename:
+            raise ValueError("ファイル名を入力してください。")
+        if any(separator in filename for separator in ("/", "\\")):
+            raise ValueError("ファイル名にパス区切り文字は使用できません。")
+        if any(char in filename for char in '<>:"|?*'):
+            raise ValueError('ファイル名に使用できない文字が含まれています。')
+        if Path(filename).name != filename:
+            raise ValueError("ファイル名のみを入力してください。")
+        if not Path(filename).suffix:
+            raise ValueError("拡張子は変更できません。")
+        return filename
+
     def _normalize_bulk_attribute_updates(self, value: object) -> dict[str, object]:
         """一括属性更新ペイロードをリポジトリ用の値へ正規化する。"""
 
@@ -1157,6 +1211,75 @@ class ImageCatalogApi:
 
         send2trash(str(image_path))
         return True, False
+
+    def _find_single_item(self, repository: ImageFileRepository, record_id: int) -> ImageFileListItem:
+        """指定IDの画像レコードを1件取得する。"""
+
+        items = repository.find_by_ids([record_id])
+        if not items:
+            raise ValueError("対象データが存在しません。")
+        return items[0]
+
+    def _rename_file_and_update_record(
+        self,
+        repository: ImageFileRepository,
+        item: ImageFileListItem,
+        filename: str,
+    ) -> ImageRenameResult:
+        """実ファイルをリネームしてDBのファイル識別情報を更新する。"""
+
+        source_path = Path(item.path)
+        destination_path = self._build_rename_destination(source_path, filename)
+        source_path.rename(destination_path)
+        try:
+            updated_count = repository.update_file_identity(
+                item.id,
+                destination_path.name,
+                str(destination_path),
+                destination_path.parent.name,
+            )
+            if updated_count != 1:
+                raise RuntimeError("Image file record could not be updated.")
+        except Exception:
+            self._restore_renamed_file(destination_path, source_path)
+            raise
+
+        return ImageRenameResult(
+            id=item.id,
+            filename=destination_path.name,
+            path=str(destination_path),
+            folder=destination_path.parent.name,
+        )
+
+    def _build_rename_destination(self, source_path: Path, filename: str) -> Path:
+        """リネーム先パスを作成し、ファイル名変更ルールを検証する。"""
+
+        if not source_path.exists():
+            raise ValueError("対象ファイルが存在しません。")
+        if not source_path.is_file():
+            raise ValueError("対象が画像ファイルではありません。")
+        if filename == source_path.name:
+            raise ValueError("現在と同じファイル名です。")
+
+        destination_path = source_path.with_name(filename)
+        if destination_path.suffix.lower() != source_path.suffix.lower():
+            raise ValueError("拡張子は変更できません。")
+        if destination_path.exists():
+            raise ValueError("同名ファイルが既に存在します。")
+        return destination_path
+
+    def _restore_renamed_file(self, destination_path: Path, source_path: Path) -> None:
+        """DB更新失敗時にリネーム済みファイルを元へ戻す。"""
+
+        try:
+            if destination_path.exists() and not source_path.exists():
+                destination_path.rename(source_path)
+        except Exception:
+            LOGGER.exception(
+                "Failed to restore renamed image file: %s -> %s",
+                destination_path,
+                source_path,
+            )
 
     def _move_files_and_update_records(
         self,

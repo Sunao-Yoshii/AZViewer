@@ -19,9 +19,13 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  editingImageId: {
+    type: Number,
+    default: null,
+  },
 })
 
-const emit = defineEmits(['open-detail', 'save-detail', 'selection-change'])
+const emit = defineEmits(['edit-finished', 'open-detail', 'save-detail', 'selection-change'])
 
 const isEditing = ref(false)
 const editRef = ref(null)
@@ -40,8 +44,23 @@ watch(
   }
 )
 
+watch(
+  () => props.editingImageId,
+  (value) => {
+    if (value === props.item.id) {
+      isEditing.value = true
+    }
+  }
+)
+
 function handleSave(payload) {
   emit('save-detail', payload)
+  emit('edit-finished', props.item.id)
+}
+
+function handleCancelEdit() {
+  isEditing.value = false
+  emit('edit-finished', props.item.id)
 }
 
 function handleOpenMetadataFromDisplay() {
@@ -59,7 +78,7 @@ function applyMetadataTextToTagInput(value) {
 
 <template>
   <div>
-    <article class="card image-tile">
+    <article :id="`image-tile-${item.id}`" class="card image-tile">
       <img
         class="image-tile-thumb"
         :src="item.thumbnailUrl || placeholderUrl"
@@ -88,7 +107,7 @@ function applyMetadataTextToTagInput(value) {
           v-if="isEditing"
           ref="editRef"
           :item="item"
-          @cancel="isEditing = false"
+          @cancel="handleCancelEdit"
           @save="handleSave"
           @open-metadata="handleOpenMetadataFromEdit"
         />

@@ -7,6 +7,7 @@ import {
   moveImageFilesToTrash,
   moveImageFilesToFolder,
   removeImageFilesFromCatalog,
+  renameImageFile,
   selectFolderDialog,
   updateImageFileDetail,
 } from '../services/backendApi'
@@ -426,6 +427,20 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     }
   }
 
+  async function moveSingleImageToTrash({ id }) {
+    if (!id) {
+      return { success: false, message: '対象画像が指定されていません。', data: null }
+    }
+    return await moveImageFilesToTrash({ ids: [id] })
+  }
+
+  async function renameSingleImageFile({ id, filename }) {
+    if (!id) {
+      return { success: false, message: '対象画像が指定されていません。', data: null }
+    }
+    return await renameImageFile({ id, filename })
+  }
+
   async function exportSelectedTags({ ids, clearSelection }) {
     const targetIds = [...(ids ?? [])]
     if (targetIds.length === 0) {
@@ -537,8 +552,10 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     importCaptionTags,
     moveSelectedImages,
     moveSelectedImagesToTrash,
+    moveSingleImageToTrash,
     openBulkAttributeEditModal,
     openBulkTagAddModal,
+    renameSingleImageFile,
     removeSelectedImagesFromCatalog,
     saveBulkAttributeEdit,
     saveBulkTagAdd,

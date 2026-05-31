@@ -1,8 +1,9 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import BulkAttributeEditModal from './components/form/BulkAttributeEditModal.vue'
 import BulkTagAddModal from './components/form/BulkTagAddModal.vue'
 import DuplicateTagSetModal from './components/form/DuplicateTagSetModal.vue'
+import ImageRenameModal from './components/form/ImageRenameModal.vue'
 import MasterMaintenanceModal from './components/form/MasterMaintenanceModal.vue'
 import WildcardExportModal from './components/form/WildcardExportModal.vue'
 import LoadingOverlay from './components/common/LoadingOverlay.vue'
@@ -24,6 +25,15 @@ const { status, setStatus } = useAppStatus()
 const { toasts, pushToast } = useToast()
 const loading = useLoadingOverlay()
 const selectedImageIdSet = ref(new Set())
+const editingImageId = ref(null)
+const isDetailActionBusy = ref(false)
+const renameModal = reactive({
+  show: false,
+  item: null,
+  filename: '',
+  isSaving: false,
+  errorMessage: '',
+})
 const selectedImageIds = computed(() => [...selectedImageIdSet.value])
 const selectedCount = computed(() => selectedImageIds.value.length)
 const visibleImageIds = computed(() => (searchResult.value.items ?? []).map((item) => item.id))
@@ -57,12 +67,18 @@ const {
   loading,
 })
 const {
+  detailModal,
+  hasNext,
+  hasPrevious,
   selectedItem,
   detailImageUrl,
   isLoadingImage,
-  handleOpenDetail,
   handleCloseDetail,
-  handleOpenContainingFolder,
+  loadDetailImage,
+  moveNext,
+  movePrevious,
+  openDetail,
+  refreshDetailItemsAfterSearch,
 } = useImageDetail({
   pushToast,
   setStatus,
@@ -158,6 +174,13 @@ async function handleSortChangeWithSelectionClear(sort) {
   await handleSortChange(sort)
 }
 
+async function handleOpenDetail(item) {
+  await openDetail({
+    item,
+    items: searchResult.value.items,
+  })
+}
+
 async function handleRemoveSelectedImagesFromCatalog() {
   await imageMutations.removeSelectedImagesFromCatalog({
     ids: selectedImageIds.value,
@@ -232,6 +255,138 @@ async function handleExportSelectedTags() {
   })
 }
 
+function buildDetailTrashConfirmMessage() {
+  return [
+    'この画像を OS のごみ箱へ移動します。',
+    '',
+    'ごみ箱への移動に成功した場合、AZViewer の管理対象からも除外されます。',
+    '環境によっては、ごみ箱から復元できない場合があります。',
+    '',
+    '実行しますか？',
+  ].join('\n')
+}
+
+async function handleMoveDetailImageToTrash(item) {
+  if (!item?.id || !window.confirm(buildDetailTrashConfirmMessage())) {
+    return
+  }
+
+  const currentIndex = detailModal.currentIndex
+  const nextCandidateId = detailModal.items[currentIndex + 1]?.id ?? null
+  const previousCandidateId = detailModal.items[currentIndex - 1]?.id ?? null
+  isDetailActionBusy.value = true
+
+  try {
+    const result = await imageMutations.moveSingleImageToTrash({ id: item.id })
+    if (!result?.success || (result.data?.failedCount ?? 0) > 0) {
+      pushToast({ type: 'danger', message: '画像をごみ箱へ移動できませんでした。' })
+      return
+    }
+
+    pushToast({ type: 'success', message: '画像をごみ箱へ移動しました。' })
+    const searched = await executeSearch()
+    if (!searched) {
+      return
+    }
+
+    const nextItem = refreshDetailItemsAfterSearch(
+      searchResult.value.items,
+      nextCandidateId,
+      previousCandidateId
+    )
+    if (nextItem) {
+      await loadDetailImage(nextItem)
+    }
+  } finally {
+    isDetailActionBusy.value = false
+  }
+}
+
+function handleOpenRenameModal(item) {
+  renameModal.show = true
+  renameModal.item = item
+  renameModal.filename = item?.filename || ''
+  renameModal.errorMessage = ''
+}
+
+function closeRenameModal() {
+  if (renameModal.isSaving) {
+    return
+  }
+  renameModal.show = false
+  renameModal.item = null
+  renameModal.filename = ''
+  renameModal.errorMessage = ''
+}
+
+function updateRenameFilename(filename) {
+  renameModal.filename = filename
+  renameModal.errorMessage = ''
+}
+
+async function handleRenameImage() {
+  const item = renameModal.item
+  if (!item?.id) {
+    return
+  }
+
+  renameModal.isSaving = true
+  renameModal.errorMessage = ''
+
+  try {
+    const result = await imageMutations.renameSingleImageFile({
+      id: item.id,
+      filename: renameModal.filename,
+    })
+    if (!result?.success) {
+      renameModal.errorMessage = result?.message || 'ファイル名を変更できませんでした。'
+      return
+    }
+
+    closeRenameModalAfterSave()
+    pushToast({ type: 'success', message: 'ファイル名を変更しました。' })
+    const searched = await executeSearch()
+    if (!searched) {
+      return
+    }
+
+    const nextItem = refreshDetailItemsAfterSearch(searchResult.value.items, item.id, null)
+    if (nextItem) {
+      await loadDetailImage(nextItem)
+    }
+  } finally {
+    renameModal.isSaving = false
+  }
+}
+
+function closeRenameModalAfterSave() {
+  renameModal.show = false
+  renameModal.item = null
+  renameModal.filename = ''
+  renameModal.errorMessage = ''
+}
+
+async function handleEditCurrentFromDetail(item) {
+  if (!item?.id) {
+    return
+  }
+
+  handleCloseDetail()
+  editingImageId.value = item.id
+  await nextTick()
+
+  document.getElementById(`image-tile-${item.id}`)?.scrollIntoView({
+    behavior: 'smooth',
+    block: 'center',
+  })
+}
+
+function handleTileEditFinished(id) {
+  if (editingImageId.value === id) {
+    editingImageId.value = null
+  }
+}
+
 function handleImportStartedEvent() {
   loading.showLoading('登録中', 'ドロップされた画像ファイルを登録しています。しばらくお待ちください。')
 }
@@ -292,20 +447,33 @@ onBeforeUnmount(() => {
       :search-result="searchResult"
       :is-searching="isSearching"
       :selected-image-ids="selectedImageIds"
+      :editing-image-id="editingImageId"
       @change-page="handlePageChangeWithSelectionClear"
       @change-page-size="handlePageSizeChangeWithSelectionClear"
       @change-sort="handleSortChangeWithSelectionClear"
+      @edit-finished="handleTileEditFinished"
       @open-detail="handleOpenDetail"
       @save-detail="handleSaveDetail"
       @selection-change="handleSelectionChange"
     />
   </MainLayout>
   <ImageDetailModal
+    :show="detailModal.show"
     :item="selectedItem"
-    :image-url="detailImageUrl"
+    :image-src="detailImageUrl"
+    :has-previous="hasPrevious"
+    :has-next="hasNext"
+    :current-index="detailModal.currentIndex"
+    :total-count="detailModal.items.length"
+    :is-busy="isSearching || isLoadingImage || isDetailActionBusy"
     :is-loading-image="isLoadingImage"
+    :is-keyboard-blocked="renameModal.show"
     @close="handleCloseDetail"
-    @open-folder="handleOpenContainingFolder"
+    @previous="movePrevious"
+    @next="moveNext"
+    @move-to-trash="handleMoveDetailImageToTrash"
+    @rename="handleOpenRenameModal"
+    @edit-current="handleEditCurrentFromDetail"
   />
   <DuplicateTagSetModal
     :show="duplicateTagSetSearch.duplicateTagSetModal.show"
@@ -347,6 +515,16 @@ onBeforeUnmount(() => {
     @close="imageMutations.closeBulkTagAddModal"
     @update-tags-text="imageMutations.updateBulkTagAddText"
     @save="handleSaveBulkTagAdd"
+  />
+  <ImageRenameModal
+    :show="renameModal.show"
+    :item="renameModal.item"
+    :filename="renameModal.filename"
+    :is-saving="renameModal.isSaving"
+    :error-message="renameModal.errorMessage"
+    @close="closeRenameModal"
+    @save="handleRenameImage"
+    @update:filename="updateRenameFilename"
   />
   <MasterMaintenanceModal
     :show="masterMaintenance.masterMaintenanceModal.show"
