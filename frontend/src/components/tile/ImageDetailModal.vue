@@ -51,6 +51,7 @@ const emit = defineEmits([
   'move-to-trash',
   'rename',
   'edit-current',
+  'open-folder',
 ])
 
 const isActualSize = ref(false)
@@ -174,6 +175,14 @@ onBeforeUnmount(() => {
                 @click="$emit('edit-current', item)"
               >
                 属性編集
+              </button>
+              <button
+                type="button"
+                class="btn btn-outline-secondary"
+                :disabled="isBusy || !item"
+                @click="$emit('open-folder', item.path)"
+              >
+                エクスプローラで開く
               </button>
               <button
                 type="button"

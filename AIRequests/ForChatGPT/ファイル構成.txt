@@ -51,6 +51,7 @@ AZViewer/
           BulkTagAddModal.vue
           DuplicateTagSetModal.vue
           FolderSearchModal.vue
+          ImageRenameModal.vue
           MasterMaintenanceModal.vue
           ModelSearchModal.vue
           search_form.vue

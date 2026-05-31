@@ -74,6 +74,7 @@ const {
   detailImageUrl,
   isLoadingImage,
   handleCloseDetail,
+  handleOpenContainingFolder,
   loadDetailImage,
   moveNext,
   movePrevious,
@@ -474,6 +475,7 @@ onBeforeUnmount(() => {
     @move-to-trash="handleMoveDetailImageToTrash"
     @rename="handleOpenRenameModal"
     @edit-current="handleEditCurrentFromDetail"
+    @open-folder="handleOpenContainingFolder"
   />
   <DuplicateTagSetModal
     :show="duplicateTagSetSearch.duplicateTagSetModal.show"
