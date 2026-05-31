@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 import mimetypes
 import shutil
 from pathlib import Path
@@ -11,14 +12,15 @@ from backend.models import (
     BulkTagAddResult,
     BulkAttributeUpdateResult,
     CaptionTagImportResult,
+    CatalogRemovalResult,
     FileMoveFailure,
     FileMoveResult,
     ImageFileListItem,
     MasterMaintenanceSearchResult,
-    PhysicalDeleteFailure,
-    PhysicalDeleteResult,
     PromptTagImportResult,
     TagCaptionExportResult,
+    TrashMoveFailure,
+    TrashMoveResult,
     WildcardExportResult,
 )
 from backend.services import (
@@ -35,6 +37,8 @@ from backend.services import (
 
 from .api_response import ApiResponse
 from .database_lifecycle_manager import DatabaseLifecycleManager
+
+LOGGER = logging.getLogger(__name__)
 
 
 class ImageCatalogApi:
@@ -157,60 +161,61 @@ class ImageCatalogApi:
                 data=self._empty_bulk_attribute_update_data(),
             ).to_dict()
 
-    def delete_image_file(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        """指定レコードを削除し、対応するサムネイルを削除する。"""
-
-        data = payload if isinstance(payload, dict) else {}
-        try:
-            record_id = int(data.get("id"))
-        except (TypeError, ValueError):
-            return ApiResponse(success=False, message="id is required.", data=None).to_dict()
-
-        deleted = self._get_repository().delete_by_id(record_id)
-        if not deleted:
-            return ApiResponse(success=False, message="対象データが存在しません。", data=None).to_dict()
-
-        self._thumbnail_cache_service.delete_thumbnail(record_id)
-        return ApiResponse(
-            success=True,
-            message="Image file deleted.",
-            data={"id": record_id},
-        ).to_dict()
-
-    def delete_image_files_with_physical_files(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
-        """指定レコードの実ファイル、サムネイル、DBレコードを一括削除する。"""
+    def remove_image_files_from_catalog(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定レコード群を実ファイルに触れず管理対象から除外する。"""
 
         try:
             data = payload if isinstance(payload, dict) else {}
-            record_ids = self._normalize_delete_ids(data.get("ids"))
+            record_ids = self._normalize_record_ids(data.get("ids"))
             if not record_ids:
                 return ApiResponse(
                     success=False,
-                    message="削除対象が指定されていません。",
-                    data=self._empty_physical_delete_data(),
+                    message="除外対象が指定されていません。",
+                    data=self._empty_catalog_removal_data(),
+                ).to_dict()
+
+            repository = self._get_repository()
+            result = self._remove_ids_from_catalog(repository, record_ids)
+            return ApiResponse(
+                success=True,
+                message="選択画像を管理対象から除外しました。",
+                data=result.to_api_data(),
+            ).to_dict()
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="管理対象からの除外に失敗しました。",
+                data=self._empty_catalog_removal_data(),
+            ).to_dict()
+
+    def move_image_files_to_trash(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定レコード群の実ファイルをごみ箱へ移動し、成功分を管理対象から除外する。"""
+
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            record_ids = self._normalize_record_ids(data.get("ids"))
+            if not record_ids:
+                return ApiResponse(
+                    success=False,
+                    message="ごみ箱へ移動する対象が指定されていません。",
+                    data=self._empty_trash_move_data(),
                 ).to_dict()
 
             repository = self._get_repository()
             items = repository.find_by_ids(record_ids)
-            if not items:
-                return ApiResponse(
-                    success=True,
-                    message="削除対象の画像はありませんでした。",
-                    data=self._empty_physical_delete_data(),
-                ).to_dict()
-
-            result = self._delete_physical_files_and_records(repository, items)
+            result = self._move_items_to_trash_and_remove(repository, items, len(record_ids))
             message = (
-                "一部画像の削除に失敗しました。"
+                "一部画像をごみ箱へ移動できませんでした。"
                 if result.failed_count > 0
-                else "選択画像の削除が完了しました。"
+                else "選択画像をごみ箱へ移動しました。"
             )
             return ApiResponse(success=True, message=message, data=result.to_api_data()).to_dict()
         except Exception:
+            LOGGER.exception("Failed to move image files to trash.")
             return ApiResponse(
                 success=False,
-                message="選択画像の削除に失敗しました。",
-                data=self._empty_physical_delete_data(),
+                message="ごみ箱への移動に失敗しました。",
+                data=self._empty_trash_move_data(),
             ).to_dict()
 
     def move_image_files_to_folder(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
@@ -915,11 +920,6 @@ class ImageCatalogApi:
             raise ValueError("モデル名は512文字以内で入力してください。")
         return model_name
 
-    def _normalize_delete_ids(self, value: object) -> list[int]:
-        """一括削除対象IDを正の整数の重複なしリストへ正規化する。"""
-
-        return self._normalize_record_ids(value)
-
     def _normalize_record_ids(self, value: object) -> list[int]:
         """レコードIDを正の整数の重複なしリストへ正規化する。"""
 
@@ -985,15 +985,25 @@ class ImageCatalogApi:
             raise ValueError("移動先がフォルダではありません。")
         return folder_path
 
-    def _empty_physical_delete_data(self) -> dict[str, object]:
-        """一括物理削除API用の空結果データを返す。"""
+    def _empty_catalog_removal_data(self) -> dict[str, object]:
+        """管理対象除外API用の空結果データを返す。"""
 
-        return PhysicalDeleteResult(
+        return CatalogRemovalResult(
             target_count=0,
-            deleted_file_count=0,
+            removed_count=0,
             deleted_thumbnail_count=0,
-            deleted_record_count=0,
-            missing_file_count=0,
+            failed_count=0,
+            failed_files=[],
+        ).to_api_data()
+
+    def _empty_trash_move_data(self) -> dict[str, object]:
+        """ごみ箱移動API用の空結果データを返す。"""
+
+        return TrashMoveResult(
+            target_count=0,
+            trashed_count=0,
+            removed_count=0,
+            deleted_thumbnail_count=0,
             failed_count=0,
             failed_files=[],
         ).to_api_data()
@@ -1060,65 +1070,82 @@ class ImageCatalogApi:
             failed_files=[],
         ).to_api_data()
 
-    def _delete_physical_files_and_records(
+    def _remove_ids_from_catalog(
         self,
         repository: ImageFileRepository,
-        items: list,
-    ) -> PhysicalDeleteResult:
-        """実ファイル削除に成功した画像だけサムネイルとDBレコードを削除する。"""
+        record_ids: list[int],
+    ) -> CatalogRemovalResult:
+        """指定ID群のサムネイルとDB登録情報を削除する。"""
 
-        delete_plan = self._delete_physical_files(items)
-        deletable_ids = delete_plan["deletable_ids"]
-        if deletable_ids:
-            deleted_thumbnail_count = self._thumbnail_cache_service.delete_thumbnails(deletable_ids)
-            deleted_record_count = repository.delete_by_ids(deletable_ids)
-        else:
-            deleted_thumbnail_count = 0
-            deleted_record_count = 0
-
-        return PhysicalDeleteResult(
-            target_count=len(items),
-            deleted_file_count=delete_plan["deleted_file_count"],
+        deleted_thumbnail_count = self._thumbnail_cache_service.delete_thumbnails(record_ids)
+        removed_count = repository.remove_from_catalog_by_ids(record_ids)
+        return CatalogRemovalResult(
+            target_count=len(record_ids),
+            removed_count=removed_count,
             deleted_thumbnail_count=deleted_thumbnail_count,
-            deleted_record_count=deleted_record_count,
-            missing_file_count=delete_plan["missing_file_count"],
-            failed_count=len(items) - len(deletable_ids),
-            failed_files=delete_plan["failed_files"],
+            failed_count=max(0, len(record_ids) - removed_count),
+            failed_files=[],
         )
 
-    def _delete_physical_files(self, items: list) -> dict[str, Any]:
-        """画像ファイルを削除し、DB削除へ進めるIDと失敗情報を返す。"""
+    def _move_items_to_trash_and_remove(
+        self,
+        repository: ImageFileRepository,
+        items: list[ImageFileListItem],
+        target_count: int,
+    ) -> TrashMoveResult:
+        """ごみ箱移動に成功または実ファイル不存在の画像を管理対象から除外する。"""
 
-        deletable_ids: list[int] = []
-        failed_files: list[PhysicalDeleteFailure] = []
-        deleted_file_count = 0
-        missing_file_count = 0
+        trash_plan = self._move_items_to_trash(items)
+        removable_ids = trash_plan["removable_ids"]
+        removed_count = 0
+        deleted_thumbnail_count = 0
+        if removable_ids:
+            try:
+                deleted_thumbnail_count = self._thumbnail_cache_service.delete_thumbnails(removable_ids)
+                removed_count = repository.remove_from_catalog_by_ids(removable_ids)
+            except Exception:
+                LOGGER.exception("Failed to remove trashed image records from catalog.")
+                raise
+
+        return TrashMoveResult(
+            target_count=target_count,
+            trashed_count=trash_plan["trashed_count"],
+            removed_count=removed_count,
+            deleted_thumbnail_count=deleted_thumbnail_count,
+            failed_count=len(trash_plan["failed_files"]),
+            failed_files=trash_plan["failed_files"],
+        )
+
+    def _move_items_to_trash(self, items: list[ImageFileListItem]) -> dict[str, Any]:
+        """画像ファイルをごみ箱へ移動し、管理対象除外へ進めるIDを返す。"""
+
+        removable_ids: list[int] = []
+        failed_files: list[TrashMoveFailure] = []
+        trashed_count = 0
 
         for item in items:
             try:
-                file_deleted, file_missing = self._delete_physical_file(item.path)
-                deleted_file_count += 1 if file_deleted else 0
-                missing_file_count += 1 if file_missing else 0
-                deletable_ids.append(item.id)
+                moved, missing = self._move_file_to_trash(item.path)
+                trashed_count += 1 if moved else 0
+                if moved or missing:
+                    removable_ids.append(item.id)
             except Exception:
-                if len(failed_files) < 20:
-                    failed_files.append(
-                        PhysicalDeleteFailure(
-                            id=item.id,
-                            path=item.path,
-                            reason="ファイルを削除できませんでした。",
-                        )
+                failed_files.append(
+                    TrashMoveFailure(
+                        id=item.id,
+                        path=item.path,
+                        reason="ごみ箱へ移動できませんでした。",
                     )
+                )
 
         return {
-            "deletable_ids": deletable_ids,
-            "deleted_file_count": deleted_file_count,
-            "missing_file_count": missing_file_count,
+            "removable_ids": removable_ids,
+            "trashed_count": trashed_count,
             "failed_files": failed_files,
         }
 
-    def _delete_physical_file(self, path: str) -> tuple[bool, bool]:
-        """1つの実ファイルを削除し、削除済みか不存在かを返す。"""
+    def _move_file_to_trash(self, path: str) -> tuple[bool, bool]:
+        """1つの実ファイルをごみ箱へ移動し、移動済みか不存在かを返す。"""
 
         image_path = Path(path)
         if not image_path.exists():
@@ -1126,7 +1153,9 @@ class ImageCatalogApi:
         if not image_path.is_file():
             raise ValueError("画像ファイルではありません。")
 
-        image_path.unlink()
+        from send2trash import send2trash
+
+        send2trash(str(image_path))
         return True, False
 
     def _move_files_and_update_records(

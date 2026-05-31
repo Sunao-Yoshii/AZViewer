@@ -44,9 +44,10 @@ defineEmits([
   'import-prompt-tags',
   'import-caption-tags',
   'toggle-visible-selection',
-  'delete-selected-images',
   'export-selected-tags',
   'move-selected-images',
+  'move-selected-images-to-trash',
+  'remove-selected-images-from-catalog',
   'open-bulk-attribute-edit',
   'open-bulk-tag-add',
   'open-wildcard-export',
@@ -57,7 +58,6 @@ defineEmits([
   'change-page-size',
   'change-sort',
   'open-detail',
-  'request-delete',
   'save-detail',
 ])
 </script>
@@ -73,9 +73,10 @@ defineEmits([
       @import-prompt-tags="$emit('import-prompt-tags')"
       @import-caption-tags="$emit('import-caption-tags')"
       @toggle-visible-selection="$emit('toggle-visible-selection')"
-      @delete-selected-images="$emit('delete-selected-images')"
       @export-selected-tags="$emit('export-selected-tags')"
       @move-selected-images="$emit('move-selected-images')"
+      @move-selected-images-to-trash="$emit('move-selected-images-to-trash')"
+      @remove-selected-images-from-catalog="$emit('remove-selected-images-from-catalog')"
       @open-bulk-attribute-edit="$emit('open-bulk-attribute-edit')"
       @open-bulk-tag-add="$emit('open-bulk-tag-add')"
       @open-wildcard-export="$emit('open-wildcard-export')"

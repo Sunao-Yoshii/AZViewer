@@ -72,16 +72,16 @@ export async function bulkUpdateImageFileAttributes(payload) {
   return await callBackendApi('bulk_update_image_file_attributes', payload)
 }
 
-export async function deleteImageFile(id) {
-  return await callBackendApi('delete_image_file', { id })
-}
-
-export async function deleteImageFilesWithPhysicalFiles(payload) {
-  return await callBackendApi('delete_image_files_with_physical_files', payload)
-}
-
 export async function moveImageFilesToFolder(payload) {
   return await callBackendApi('move_image_files_to_folder', payload)
+}
+
+export async function removeImageFilesFromCatalog(payload) {
+  return await callBackendApi('remove_image_files_from_catalog', payload)
+}
+
+export async function moveImageFilesToTrash(payload) {
+  return await callBackendApi('move_image_files_to_trash', payload)
 }
 
 export async function exportSelectedImageTags(payload) {

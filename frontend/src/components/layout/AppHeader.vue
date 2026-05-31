@@ -26,8 +26,9 @@ defineEmits([
   'open-bulk-attribute-edit',
   'open-wildcard-export',
   'export-selected-tags',
-  'delete-selected-images',
   'move-selected-images',
+  'move-selected-images-to-trash',
+  'remove-selected-images-from-catalog',
   'import-prompt-tags',
   'import-caption-tags',
   'open-bulk-tag-add',
@@ -113,11 +114,22 @@ defineEmits([
             <li>
               <button
                 type="button"
-                class="dropdown-item text-danger"
+                class="dropdown-item text-warning"
                 :disabled="isBusy || selectedCount === 0"
-                @click="$emit('delete-selected-images')"
+                @click="$emit('move-selected-images-to-trash')"
               >
-                選択画像を削除
+                ごみ箱へ移動
+              </button>
+            </li>
+            <li><hr class="dropdown-divider" /></li>
+            <li>
+              <button
+                type="button"
+                class="dropdown-item"
+                :disabled="isBusy || selectedCount === 0"
+                @click="$emit('remove-selected-images-from-catalog')"
+              >
+                選択画像を管理対象から除外
               </button>
             </li>
           </ul>

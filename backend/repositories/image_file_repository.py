@@ -762,31 +762,36 @@ class ImageFileRepository:
             self._connection.rollback()
             raise
 
-    def delete_by_id(self, record_id: int) -> bool:
-        """IDに一致する画像ファイル情報を削除する。"""
-
-        self.delete_tag_hash(record_id)
-        cursor = self._connection.execute(
-            "DELETE FROM image_file_data WHERE id = ?",
-            (record_id,),
-        )
-        self._connection.commit()
-        return cursor.rowcount > 0
-
-    def delete_by_ids(self, record_ids: list[int]) -> int:
-        """指定ID群に一致する画像ファイル情報を削除し、削除件数を返す。"""
+    def remove_from_catalog_by_ids(self, record_ids: list[int]) -> int:
+        """指定ID群を画像カタログの管理対象から除外する。"""
 
         if not record_ids:
             return 0
 
         placeholders = ", ".join("?" for _ in record_ids)
-        self.delete_tag_hashes(record_ids)
-        cursor = self._connection.execute(
-            f"DELETE FROM image_file_data WHERE id IN ({placeholders})",
-            record_ids,
-        )
-        self._connection.commit()
-        return cursor.rowcount
+        try:
+            self._connection.execute("BEGIN")
+            self._connection.execute(
+                f"DELETE FROM tag_image_link WHERE image_file_id IN ({placeholders})",
+                record_ids,
+            )
+            self._connection.execute(
+                f"DELETE FROM image_model_to_file_data WHERE image_file_data_id IN ({placeholders})",
+                record_ids,
+            )
+            self._connection.execute(
+                f"DELETE FROM tag_hash WHERE image_file_data_id IN ({placeholders})",
+                record_ids,
+            )
+            cursor = self._connection.execute(
+                f"DELETE FROM image_file_data WHERE id IN ({placeholders})",
+                record_ids,
+            )
+            self._connection.commit()
+            return cursor.rowcount
+        except Exception:
+            self._connection.rollback()
+            raise
 
     def update_paths(self, updates: list[dict[str, object]]) -> int:
         """指定ID群のパスとフォルダを更新し、更新件数を返す。"""

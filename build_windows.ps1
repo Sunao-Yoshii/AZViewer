@@ -273,6 +273,7 @@ try {
         --collect-all "clr_loader" `
         --collect-all "cffi" `
         --collect-all "PIL" `
+        --collect-all "send2trash" `
         --add-data "frontend\dist;frontend\dist" `
         "backend\main.py"
 }

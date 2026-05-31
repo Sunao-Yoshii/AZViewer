@@ -184,16 +184,6 @@ body {
   width: 300px;
 }
 
-.image-tile-delete {
-  position: absolute;
-  top: 0.35rem;
-  right: 0.35rem;
-  z-index: 1;
-  padding: 0.35rem;
-  background-color: rgba(255, 255, 255, 0.86);
-  border-radius: 50%;
-}
-
 .image-tile-thumb {
   width: 300px;
   height: 300px;

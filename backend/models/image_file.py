@@ -433,8 +433,8 @@ class PromptTagImportResult:
 
 
 @dataclass(frozen=True)
-class PhysicalDeleteFailure:
-    """物理削除で失敗した画像1件分を表す。"""
+class CatalogRemovalFailure:
+    """管理対象除外で失敗した画像1件分を表す。"""
 
     id: int
     path: str
@@ -451,26 +451,67 @@ class PhysicalDeleteFailure:
 
 
 @dataclass(frozen=True)
-class PhysicalDeleteResult:
-    """画像ファイルの一括物理削除処理結果を表す。"""
+class CatalogRemovalResult:
+    """画像の管理対象除外処理結果を表す。"""
 
     target_count: int
-    deleted_file_count: int
+    removed_count: int
     deleted_thumbnail_count: int
-    deleted_record_count: int
-    missing_file_count: int
     failed_count: int
-    failed_files: list[PhysicalDeleteFailure]
+    failed_files: list[CatalogRemovalFailure]
 
     def to_api_data(self) -> dict[str, object]:
         """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
 
         return {
             "targetCount": self.target_count,
-            "deletedFileCount": self.deleted_file_count,
+            "removedCount": self.removed_count,
             "deletedThumbnailCount": self.deleted_thumbnail_count,
-            "deletedRecordCount": self.deleted_record_count,
-            "missingFileCount": self.missing_file_count,
+            "failedCount": self.failed_count,
+            "failedFiles": [
+                item.to_dict()
+                for item in self.failed_files[:20]
+            ],
+        }
+
+
+@dataclass(frozen=True)
+class TrashMoveFailure:
+    """ごみ箱移動で失敗した画像1件分を表す。"""
+
+    id: int
+    path: str
+    reason: str
+
+    def to_dict(self) -> dict[str, object]:
+        """API返却用の辞書形式へ変換する。"""
+
+        return {
+            "id": self.id,
+            "path": self.path,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
+class TrashMoveResult:
+    """画像ファイルのごみ箱移動処理結果を表す。"""
+
+    target_count: int
+    trashed_count: int
+    removed_count: int
+    deleted_thumbnail_count: int
+    failed_count: int
+    failed_files: list[TrashMoveFailure]
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "targetCount": self.target_count,
+            "trashedCount": self.trashed_count,
+            "removedCount": self.removed_count,
+            "deletedThumbnailCount": self.deleted_thumbnail_count,
             "failedCount": self.failed_count,
             "failedFiles": [
                 item.to_dict()

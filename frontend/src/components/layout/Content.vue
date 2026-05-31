@@ -22,7 +22,6 @@ defineEmits([
   'change-page-size',
   'change-sort',
   'open-detail',
-  'request-delete',
   'save-detail',
   'selection-change',
 ])
@@ -87,7 +86,6 @@ const pageSizeOptions = [25, 50, 75, 100]
         :is-searching="isSearching"
         :selected="selectedImageIds.includes(item.id)"
         @open-detail="$emit('open-detail', $event)"
-        @request-delete="$emit('request-delete', $event)"
         @save-detail="$emit('save-detail', $event)"
         @selection-change="$emit('selection-change', $event)"
       />

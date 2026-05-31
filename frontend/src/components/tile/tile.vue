@@ -21,7 +21,7 @@ const props = defineProps({
   },
 })
 
-const emit = defineEmits(['open-detail', 'request-delete', 'save-detail', 'selection-change'])
+const emit = defineEmits(['open-detail', 'save-detail', 'selection-change'])
 
 const isEditing = ref(false)
 const editRef = ref(null)
@@ -60,13 +60,6 @@ function applyMetadataTextToTagInput(value) {
 <template>
   <div>
     <article class="card image-tile">
-      <button
-        type="button"
-        class="btn-close image-tile-delete"
-        aria-label="削除"
-        :disabled="isSearching"
-        @click.stop="$emit('request-delete', item.id)"
-      ></button>
       <img
         class="image-tile-thumb"
         :src="item.thumbnailUrl || placeholderUrl"

@@ -105,15 +105,15 @@ class AppApi:
 
         return self._image_catalog_api.bulk_update_image_file_attributes(payload)
 
-    def delete_image_file(self, payload: dict[str, object]) -> dict[str, object]:
-        """指定レコードを削除する。"""
+    def remove_image_files_from_catalog(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """指定レコード群を管理対象から除外する。"""
 
-        return self._image_catalog_api.delete_image_file(payload)
+        return self._image_catalog_api.remove_image_files_from_catalog(payload)
 
-    def delete_image_files_with_physical_files(self, payload: dict[str, object]) -> dict[str, object]:
-        """指定レコードの実ファイルを含めて一括削除する。"""
+    def move_image_files_to_trash(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """指定レコード群の実ファイルをごみ箱へ移動する。"""
 
-        return self._image_catalog_api.delete_image_files_with_physical_files(payload)
+        return self._image_catalog_api.move_image_files_to_trash(payload)
 
     def move_image_files_to_folder(self, payload: dict[str, object]) -> dict[str, object]:
         """指定レコードの実ファイルを指定フォルダへ一括移動する。"""

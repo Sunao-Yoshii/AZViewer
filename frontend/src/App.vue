@@ -75,9 +75,7 @@ const imageMutations = useImageMutations({
   loading,
 })
 const {
-  deleteSelectedImages,
   exportSelectedTags,
-  handleDelete,
   handleSaveDetail,
   moveSelectedImages,
 } = imageMutations
@@ -160,8 +158,16 @@ async function handleSortChangeWithSelectionClear(sort) {
   await handleSortChange(sort)
 }
 
-async function handleDeleteSelectedImages() {
-  await deleteSelectedImages({
+async function handleRemoveSelectedImagesFromCatalog() {
+  await imageMutations.removeSelectedImagesFromCatalog({
+    ids: selectedImageIds.value,
+    refresh: executeSearch,
+    clearSelection,
+  })
+}
+
+async function handleMoveSelectedImagesToTrash() {
+  await imageMutations.moveSelectedImagesToTrash({
     ids: selectedImageIds.value,
     refresh: executeSearch,
     clearSelection,
@@ -272,7 +278,8 @@ onBeforeUnmount(() => {
     @import-prompt-tags="handleImportPromptTags"
     @import-caption-tags="handleImportCaptionTags"
     @toggle-visible-selection="handleToggleVisibleSelection"
-    @delete-selected-images="handleDeleteSelectedImages"
+    @remove-selected-images-from-catalog="handleRemoveSelectedImagesFromCatalog"
+    @move-selected-images-to-trash="handleMoveSelectedImagesToTrash"
     @move-selected-images="handleMoveSelectedImages"
     @open-bulk-attribute-edit="handleOpenBulkAttributeEdit"
     @open-bulk-tag-add="handleOpenBulkTagAdd"
@@ -289,7 +296,6 @@ onBeforeUnmount(() => {
       @change-page-size="handlePageSizeChangeWithSelectionClear"
       @change-sort="handleSortChangeWithSelectionClear"
       @open-detail="handleOpenDetail"
-      @request-delete="handleDelete"
       @save-detail="handleSaveDetail"
       @selection-change="handleSelectionChange"
     />

@@ -2,41 +2,54 @@ import { reactive } from 'vue'
 import {
   bulkAddTags,
   bulkUpdateImageFileAttributes,
-  deleteImageFile,
-  deleteImageFilesWithPhysicalFiles,
   exportSelectedImageTags,
   importCaptionTags as importCaptionTagsApi,
+  moveImageFilesToTrash,
   moveImageFilesToFolder,
+  removeImageFilesFromCatalog,
   selectFolderDialog,
   updateImageFileDetail,
 } from '../services/backendApi'
 
-function buildPhysicalDeleteConfirmMessage(count) {
+function buildCatalogRemovalConfirmMessage(count) {
   return [
-    `選択した ${count} 件の画像を削除します。`,
+    `選択した ${count} 件の画像を AZViewer の管理対象から除外します。`,
     '',
-    'この操作では、AZViewer 上の登録情報だけでなく、実際の画像ファイルもディスクから削除されます。',
-    'この操作は元に戻せません。',
+    'この操作では、AZViewer 上の登録情報、タグ関連情報、モデル関連情報、サムネイルキャッシュを削除します。',
+    '実際の画像ファイルは削除されません。',
     '',
-    '削除しますか？',
+    '実行しますか？',
   ].join('\n')
 }
 
-function pushPhysicalDeleteResultToast(pushToast, result, targetCount) {
-  const data = result.data ?? {}
-  const failedCount = data.failedCount ?? 0
+function buildTrashMoveConfirmMessage(count) {
+  return [
+    `選択した ${count} 件の画像を OS のごみ箱へ移動します。`,
+    '',
+    'ごみ箱への移動に成功した画像は、AZViewer の管理対象からも除外されます。',
+    '環境によっては、ごみ箱から復元できない場合があります。',
+    '',
+    '実行しますか？',
+  ].join('\n')
+}
 
-  if (failedCount > 0) {
-    pushToast({
-      type: 'warning',
-      message: `一部画像の削除に失敗しました。対象: ${data.targetCount ?? targetCount} 件 / 削除: ${data.deletedRecordCount ?? 0} 件 / 失敗: ${failedCount} 件`,
-    })
-    return
-  }
-
+function pushCatalogRemovalResultToast(pushToast, result, targetCount) {
+  const data = result?.data ?? {}
   pushToast({
     type: 'success',
-    message: `選択画像の削除が完了しました。対象: ${data.targetCount ?? targetCount} 件 / 削除: ${data.deletedRecordCount ?? 0} 件`,
+    message: `選択画像を管理対象から除外しました。対象: ${data.targetCount ?? targetCount} 件 / 除外: ${data.removedCount ?? 0} 件 / 失敗: ${data.failedCount ?? 0} 件`,
+  })
+}
+
+function pushTrashMoveResultToast(pushToast, result, targetCount) {
+  const data = result?.data ?? {}
+  const failedCount = data.failedCount ?? 0
+
+  pushToast({
+    type: failedCount > 0 ? 'warning' : 'success',
+    message: failedCount > 0
+      ? `一部画像をごみ箱へ移動できませんでした。対象: ${data.targetCount ?? targetCount} 件 / 移動: ${data.trashedCount ?? 0} 件 / 失敗: ${failedCount} 件`
+      : `選択画像をごみ箱へ移動しました。対象: ${data.targetCount ?? targetCount} 件 / 移動: ${data.trashedCount ?? 0} 件`,
   })
 }
 
@@ -216,19 +229,6 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     bulkAttributeEditModal.form = createBulkAttributeEditForm()
   }
 
-  async function handleDelete(id) {
-    if (!window.confirm('このアプリケーション上から削除します。よろしいですか？')) {
-      return
-    }
-
-    const result = await deleteImageFile(id)
-    if (!result.success) {
-      pushToast({ type: 'error', message: result.message || '削除に失敗しました。' })
-      return
-    }
-    await refresh({}, true)
-  }
-
   function openBulkAttributeEditModal({ ids }) {
     const targetIds = [...(ids ?? [])]
 
@@ -321,33 +321,65 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     }
   }
 
-  async function deleteSelectedImages({ ids, refresh: refreshSelected, clearSelection }) {
+  async function removeSelectedImagesFromCatalog({ ids, refresh: refreshSelected, clearSelection }) {
     const targetIds = [...(ids ?? [])]
     if (targetIds.length === 0) {
       return
     }
 
-    if (!window.confirm(buildPhysicalDeleteConfirmMessage(targetIds.length))) {
+    if (!window.confirm(buildCatalogRemovalConfirmMessage(targetIds.length))) {
       return
     }
 
     loading?.showLoading(
-      '選択画像を削除中',
-      '実ファイル、サムネイル、登録情報を削除しています...'
+      '管理対象から除外中',
+      '選択画像の登録情報を AZViewer から除外しています...'
     )
 
     try {
-      const result = await deleteImageFilesWithPhysicalFiles({ ids: targetIds })
+      const result = await removeImageFilesFromCatalog({ ids: targetIds })
       if (!result?.success) {
-        pushToast({ type: 'danger', message: result?.message || '選択画像の削除に失敗しました。' })
+        pushToast({ type: 'danger', message: result?.message || '管理対象からの除外に失敗しました。' })
         return
       }
 
-      pushPhysicalDeleteResultToast(pushToast, result, targetIds.length)
+      pushCatalogRemovalResultToast(pushToast, result, targetIds.length)
       clearSelection?.()
       await refreshSelected?.()
     } catch (error) {
-      pushToast({ type: 'danger', message: '選択画像の削除に失敗しました。' })
+      pushToast({ type: 'danger', message: '管理対象からの除外に失敗しました。' })
+    } finally {
+      loading?.hideLoading()
+    }
+  }
+
+  async function moveSelectedImagesToTrash({ ids, refresh: refreshSelected, clearSelection }) {
+    const targetIds = [...(ids ?? [])]
+    if (targetIds.length === 0) {
+      return
+    }
+
+    if (!window.confirm(buildTrashMoveConfirmMessage(targetIds.length))) {
+      return
+    }
+
+    loading?.showLoading(
+      'ごみ箱へ移動中',
+      '選択画像をごみ箱へ移動し、登録情報を整理しています...'
+    )
+
+    try {
+      const result = await moveImageFilesToTrash({ ids: targetIds })
+      if (!result?.success) {
+        pushToast({ type: 'danger', message: result?.message || 'ごみ箱への移動に失敗しました。' })
+        return
+      }
+
+      pushTrashMoveResultToast(pushToast, result, targetIds.length)
+      clearSelection?.()
+      await refreshSelected?.()
+    } catch (error) {
+      pushToast({ type: 'danger', message: 'ごみ箱への移動に失敗しました。' })
     } finally {
       loading?.hideLoading()
     }
@@ -500,14 +532,14 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     bulkTagAddModal,
     closeBulkAttributeEditModal,
     closeBulkTagAddModal,
-    deleteSelectedImages,
     exportSelectedTags,
-    handleDelete,
     handleSaveDetail,
     importCaptionTags,
     moveSelectedImages,
+    moveSelectedImagesToTrash,
     openBulkAttributeEditModal,
     openBulkTagAddModal,
+    removeSelectedImagesFromCatalog,
     saveBulkAttributeEdit,
     saveBulkTagAdd,
     updateBulkAttributeEditForm,
