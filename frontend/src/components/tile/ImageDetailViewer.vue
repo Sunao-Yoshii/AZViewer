@@ -97,6 +97,12 @@ function handleKeydown(event) {
   if (event.key === 'ArrowRight' && props.hasNext && !props.isBusy) {
     event.preventDefault()
     emit('next')
+    return
+  }
+
+  if (event.key === 'Delete' && props.item && !props.isBusy) {
+    event.preventDefault()
+    emit('move-to-trash', props.item)
   }
 }
 

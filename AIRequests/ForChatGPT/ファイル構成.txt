@@ -1,4 +1,5 @@
 AZViewer/
+  AZViewer.spec
   build_windows.ps1
   backend/
     api/
