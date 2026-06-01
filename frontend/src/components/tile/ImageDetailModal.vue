@@ -1,5 +1,5 @@
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   show: {
@@ -51,13 +51,18 @@ const emit = defineEmits([
   'move-to-trash',
   'rename',
   'edit-current',
-  'open-folder',
 ])
 
 const isActualSize = ref(false)
+const displayPosition = computed(() => {
+  if (props.totalCount <= 0 || props.currentIndex < 0) {
+    return ''
+  }
+  return `${props.currentIndex + 1} / ${props.totalCount}`
+})
 
 watch(
-  () => props.item,
+  () => [props.item?.id, props.imageSrc],
   () => {
     isActualSize.value = false
   }
@@ -94,6 +99,13 @@ function handleKeydown(event) {
   }
 }
 
+function toggleActualSize() {
+  if (props.isLoadingImage || !props.imageSrc) {
+    return
+  }
+  isActualSize.value = !isActualSize.value
+}
+
 onMounted(() => {
   window.addEventListener('keydown', handleKeydown)
 })
@@ -104,115 +116,141 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div v-if="show && item" class="modal-backdrop-shell" role="presentation">
-    <div
-      class="modal d-block"
-      tabindex="-1"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="imageDetailTitle"
-    >
-      <div class="modal-dialog modal-xl modal-dialog-centered image-detail-dialog">
-        <div class="modal-content image-detail-content">
-          <div class="modal-header">
-            <h1
-              id="imageDetailTitle"
-              class="modal-title fs-5 detail-modal-title"
-            >
-              <span>{{ item.filename }}</span>
-              <span class="detail-modal-position text-secondary">
-                {{ currentIndex + 1 }} / {{ totalCount }}
-              </span>
-            </h1>
-            <button
-              type="button"
-              class="btn-close"
-              aria-label="閉じる"
-              :disabled="isBusy"
-              @click="$emit('close')"
-            ></button>
-          </div>
+  <div
+    v-if="show && item"
+    class="image-detail-viewer"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="imageDetailTitle"
+  >
+    <aside class="image-detail-viewer-sidebar">
+      <section class="image-detail-viewer-section">
+        <div class="small text-muted">ファイル情報</div>
+        <h1
+          id="imageDetailTitle"
+          class="image-detail-viewer-filename"
+        >
+          {{ item.filename }}
+        </h1>
+        <div
+          v-if="item.folder || item.path"
+          class="image-detail-viewer-path small"
+        >
+          {{ item.folder || item.path }}
+        </div>
+        <div
+          v-if="displayPosition"
+          class="image-detail-viewer-position small"
+        >
+          {{ displayPosition }}
+        </div>
+      </section>
 
-          <div class="modal-body image-detail-body">
-            <div class="image-detail-preview" :class="{ 'is-actual-size': isActualSize }">
-              <div v-if="isLoadingImage" class="text-secondary">読み込み中</div>
-              <img
-                v-else-if="imageSrc"
-                class="image-detail-image"
-                :class="{ 'is-actual-size': isActualSize }"
-                :src="imageSrc"
-                :alt="item.filename"
-                @click="isActualSize = !isActualSize"
-              />
-              <div v-else class="text-secondary">画像を表示できません</div>
-            </div>
-          </div>
+      <section class="image-detail-viewer-section">
+        <div class="small text-muted">移動</div>
+        <div class="d-grid gap-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-light"
+            :disabled="isBusy || !hasPrevious"
+            @click="$emit('previous')"
+          >
+            前へ
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-light"
+            :disabled="isBusy || !hasNext"
+            @click="$emit('next')"
+          >
+            次へ
+          </button>
+        </div>
+      </section>
 
-          <div class="modal-footer image-detail-modal-footer">
-            <div class="image-detail-modal-nav-actions">
-              <button
-                type="button"
-                class="btn btn-outline-secondary"
-                :disabled="isBusy || !hasPrevious"
-                @click="$emit('previous')"
-              >
-                前へ
-              </button>
-              <button
-                type="button"
-                class="btn btn-outline-secondary"
-                :disabled="isBusy || !hasNext"
-                @click="$emit('next')"
-              >
-                次へ
-              </button>
-            </div>
-            <div class="image-detail-modal-main-actions">
-              <button
-                type="button"
-                class="btn btn-outline-primary"
-                :disabled="isBusy || !item"
-                @click="$emit('edit-current', item)"
-              >
-                属性編集
-              </button>
-              <button
-                type="button"
-                class="btn btn-outline-secondary"
-                :disabled="isBusy || !item"
-                @click="$emit('open-folder', item.path)"
-              >
-                エクスプローラで開く
-              </button>
-              <button
-                type="button"
-                class="btn btn-outline-secondary"
-                :disabled="isBusy || !item"
-                @click="$emit('rename', item)"
-              >
-                リネーム
-              </button>
-              <button
-                type="button"
-                class="btn btn-outline-warning"
-                :disabled="isBusy || !item"
-                @click="$emit('move-to-trash', item)"
-              >
-                ごみ箱へ移動
-              </button>
-              <button
-                type="button"
-                class="btn btn-secondary"
-                :disabled="isBusy"
-                @click="$emit('close')"
-              >
-                閉じる
-              </button>
-            </div>
-          </div>
+      <section class="image-detail-viewer-section">
+        <div class="small text-muted">表示</div>
+        <div class="d-grid gap-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-light"
+            :disabled="isLoadingImage || !imageSrc"
+            @click="toggleActualSize"
+          >
+            {{ isActualSize ? '画面に合わせる' : '実寸表示' }}
+          </button>
+        </div>
+      </section>
+
+      <section class="image-detail-viewer-section">
+        <div class="small text-muted">操作</div>
+        <div class="d-grid gap-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-light"
+            :disabled="isBusy || !item"
+            @click="$emit('edit-current', item)"
+          >
+            属性編集
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-light"
+            :disabled="isBusy || !item"
+            @click="$emit('rename', item)"
+          >
+            リネーム
+          </button>
+        </div>
+      </section>
+
+      <section class="image-detail-viewer-section image-detail-viewer-danger-section">
+        <div class="d-grid gap-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-warning"
+            :disabled="isBusy || !item"
+            @click="$emit('move-to-trash', item)"
+          >
+            ごみ箱へ移動
+          </button>
+        </div>
+      </section>
+
+      <section class="image-detail-viewer-section">
+        <div class="d-grid gap-2">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-light"
+            :disabled="isBusy"
+            @click="$emit('close')"
+          >
+            閉じる
+          </button>
+        </div>
+      </section>
+    </aside>
+
+    <main class="image-detail-viewer-main">
+      <div
+        class="image-detail-viewer-image-stage"
+        :class="{ 'is-actual-size': isActualSize }"
+      >
+        <div v-if="isLoadingImage" class="image-detail-viewer-message">
+          画像を読み込んでいます...
+        </div>
+        <img
+          v-else-if="imageSrc"
+          class="image-detail-viewer-image-fit"
+          :class="{ 'image-detail-viewer-image-actual': isActualSize }"
+          :src="imageSrc"
+          :alt="item.filename"
+          @click="toggleActualSize"
+        />
+        <div v-else class="image-detail-viewer-message">
+          画像を表示できませんでした。
         </div>
       </div>
-    </div>
-    <div class="modal-backdrop show"></div>
+    </main>
   </div>
 </template>
