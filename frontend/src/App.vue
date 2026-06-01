@@ -381,6 +381,12 @@ async function handleEditCurrentFromDetail(item) {
   })
 }
 
+async function handleOpenDetailImageContainingFolder(item) {
+  await imageMutations.openContainingFolder({
+    path: item?.path,
+  })
+}
+
 function handleTileEditFinished(id) {
   if (editingImageId.value === id) {
     editingImageId.value = null
@@ -474,6 +480,7 @@ onBeforeUnmount(() => {
     @move-to-trash="handleMoveDetailImageToTrash"
     @rename="handleOpenRenameModal"
     @edit-current="handleEditCurrentFromDetail"
+    @open-containing-folder="handleOpenDetailImageContainingFolder"
   />
   <DuplicateTagSetModal
     :show="duplicateTagSetSearch.duplicateTagSetModal.show"

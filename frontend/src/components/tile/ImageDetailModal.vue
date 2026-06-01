@@ -51,6 +51,7 @@ const emit = defineEmits([
   'move-to-trash',
   'rename',
   'edit-current',
+  'open-containing-folder',
 ])
 
 const isActualSize = ref(false)
@@ -144,6 +145,15 @@ onBeforeUnmount(() => {
         >
           {{ displayPosition }}
         </div>
+        <button
+          type="button"
+          class="btn btn-outline-light btn-sm w-100"
+          :disabled="isBusy || isLoadingImage || !item?.path"
+          title="画像ファイルのあるフォルダを開きます"
+          @click="$emit('open-containing-folder', item)"
+        >
+          エクスプローラで開く
+        </button>
       </section>
 
       <section class="image-detail-viewer-section">

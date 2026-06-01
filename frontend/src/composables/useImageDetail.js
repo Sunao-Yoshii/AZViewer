@@ -1,8 +1,5 @@
 import { computed, reactive } from 'vue'
-import {
-  fetchLocalImage,
-  openContainingFolder,
-} from '../services/backendApi'
+import { fetchLocalImage } from '../services/backendApi'
 
 export function useImageDetail({ pushToast }) {
   const detailModal = reactive({
@@ -114,13 +111,6 @@ export function useImageDetail({ pushToast }) {
     return nextItems[nextIndex]
   }
 
-  async function handleOpenContainingFolder(path) {
-    const result = await openContainingFolder(path)
-    if (!result.success) {
-      pushToast({ type: 'error', message: result.message || 'フォルダを開けませんでした。' })
-    }
-  }
-
   return {
     detailModal,
     selectedItem,
@@ -131,7 +121,6 @@ export function useImageDetail({ pushToast }) {
     closeDetail,
     handleOpenDetail,
     handleCloseDetail,
-    handleOpenContainingFolder,
     loadDetailImage,
     moveNext,
     movePrevious,

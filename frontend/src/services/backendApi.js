@@ -168,6 +168,7 @@ export async function exportWildcardText(payload) {
   return await callBackendApi('export_wildcard_text', payload)
 }
 
-export async function openContainingFolder(path) {
-  return await callBackendApi('open_containing_folder', { path })
+export async function openContainingFolder(payload) {
+  const data = typeof payload === 'string' ? { path: payload } : payload
+  return await callBackendApi('open_containing_folder', data)
 }

@@ -6,6 +6,7 @@ import {
   importCaptionTags as importCaptionTagsApi,
   moveImageFilesToTrash,
   moveImageFilesToFolder,
+  openContainingFolder as openContainingFolderApi,
   removeImageFilesFromCatalog,
   renameImageFile,
   selectFolderDialog,
@@ -441,6 +442,34 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     return await renameImageFile({ id, filename })
   }
 
+  async function openContainingFolder({ path }) {
+    if (!path) {
+      pushToast({
+        type: 'warning',
+        message: '画像ファイルのパスを確認できませんでした。',
+      })
+      return { success: false }
+    }
+
+    try {
+      const result = await openContainingFolderApi({ path })
+      if (!result?.success) {
+        pushToast({
+          type: 'danger',
+          message: result?.message || 'エクスプローラで開けませんでした。',
+        })
+        return result
+      }
+      return result
+    } catch (error) {
+      pushToast({
+        type: 'danger',
+        message: 'エクスプローラで開けませんでした。',
+      })
+      return { success: false }
+    }
+  }
+
   async function exportSelectedTags({ ids, clearSelection }) {
     const targetIds = [...(ids ?? [])]
     if (targetIds.length === 0) {
@@ -555,6 +584,7 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     moveSingleImageToTrash,
     openBulkAttributeEditModal,
     openBulkTagAddModal,
+    openContainingFolder,
     renameSingleImageFile,
     removeSelectedImagesFromCatalog,
     saveBulkAttributeEdit,
