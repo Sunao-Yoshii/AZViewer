@@ -122,13 +122,13 @@ onBeforeUnmount(() => {
     class="image-detail-viewer"
     role="dialog"
     aria-modal="true"
-    aria-labelledby="imageDetailTitle"
+    aria-labelledby="imageDetailViewerTitle"
   >
     <aside class="image-detail-viewer-sidebar">
       <section class="image-detail-viewer-section">
         <div class="small text-muted">ファイル情報</div>
         <h1
-          id="imageDetailTitle"
+          id="imageDetailViewerTitle"
           class="image-detail-viewer-filename"
         >
           {{ item.filename }}

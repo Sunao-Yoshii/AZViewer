@@ -9,7 +9,7 @@ import WildcardExportModal from './components/form/WildcardExportModal.vue'
 import LoadingOverlay from './components/common/LoadingOverlay.vue'
 import Content from './components/layout/Content.vue'
 import MainLayout from './components/layout/MainLayout.vue'
-import ImageDetailModal from './components/tile/ImageDetailModal.vue'
+import ImageDetailViewer from './components/tile/ImageDetailViewer.vue'
 import { useAppStatus } from './composables/useAppStatus'
 import { useDuplicateTagSetSearch } from './composables/useDuplicateTagSetSearch'
 import { useImageDetail } from './composables/useImageDetail'
@@ -463,7 +463,7 @@ onBeforeUnmount(() => {
       @selection-change="handleSelectionChange"
     />
   </MainLayout>
-  <ImageDetailModal
+  <ImageDetailViewer
     :show="detailModal.show"
     :item="selectedItem"
     :image-src="detailImageUrl"
