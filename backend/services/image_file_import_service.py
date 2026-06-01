@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-from sqlite3 import Connection
 from typing import Any
 
 from backend.models import ImportResult
@@ -17,14 +16,12 @@ class ImageFileImportService:
 
     def __init__(
         self,
-        connection: Connection,
         repository: ImageFileRepository,
         file_scan_service: FileScanService,
         thumbnail_cache_service: ThumbnailCacheService,
     ) -> None:
-        """登録処理で利用するDB接続、リポジトリ、スキャンサービスを保持する。"""
+        """登録処理で利用するリポジトリ、スキャンサービスを保持する。"""
 
-        self._connection = connection
         self._repository = repository
         self._file_scan_service = file_scan_service
         self._thumbnail_cache_service = thumbnail_cache_service
@@ -67,11 +64,8 @@ class ImageFileImportService:
             )
 
         try:
-            self._connection.execute("BEGIN")
             self._repository.insert_many(records)
-            self._connection.commit()
         except Exception as exc:
-            self._connection.rollback()
             return ImportResult(
                 success=False,
                 error_summary="データ登録中にエラーが発生しました。",

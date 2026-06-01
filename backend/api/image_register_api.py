@@ -37,11 +37,10 @@ class ImageRegisterApi:
         if self._import_service is not None:
             return self._import_service
 
-        connection = self._database_lifecycle_manager.get_connection()
-        self._repository = ImageFileRepository(connection)
+        engine = self._database_lifecycle_manager.get_engine()
+        self._repository = ImageFileRepository(engine)
         self._repository.create_table()
         self._import_service = ImageFileImportService(
-            connection,
             self._repository,
             FileScanService(),
             self._thumbnail_cache_service,

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from sqlite3 import Connection
 
 from backend.repositories import ImageFileRepository
 from backend.services.thumbnail_cache_service import ThumbnailCacheService
@@ -12,13 +11,11 @@ class StartupCleanupService:
 
     def __init__(
         self,
-        connection: Connection,
         repository: ImageFileRepository,
         thumbnail_cache_service: ThumbnailCacheService,
     ) -> None:
-        """クリーンアップ処理で利用するDB接続とリポジトリを保持する。"""
+        """クリーンアップ処理で利用するリポジトリを保持する。"""
 
-        self._connection = connection
         self._repository = repository
         self._thumbnail_cache_service = thumbnail_cache_service
 
@@ -32,6 +29,5 @@ class StartupCleanupService:
             return 0
 
         deleted_ids = self._repository.delete_by_paths(missing_paths)
-        self._connection.commit()
         self._thumbnail_cache_service.delete_thumbnails(deleted_ids)
         return len(missing_paths)

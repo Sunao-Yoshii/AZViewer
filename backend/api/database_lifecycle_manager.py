@@ -1,39 +1,51 @@
 from __future__ import annotations
 
-from sqlite3 import Connection
+from pathlib import Path
 
-from backend.db import ConnectionManager
+from sqlalchemy.engine import Engine
+
+from backend.db import create_database_engine
 
 
 class DatabaseLifecycleManager:
-    """アプリケーション全体で共有するSQLite接続のライフサイクルのみを管理する。
+    """アプリケーション全体で共有する SQLAlchemy Engine のライフサイクルを管理する。
 
     Repository / Service / API インスタンスは保持しない。
     """
 
-    def __init__(self) -> None:
-        """共有SQLite接続の管理に使うConnectionManagerを準備する。"""
+    def __init__(self, db_path: str | Path | None = None) -> None:
+        """Engine 作成に使う DB パスと初期化状態を保持する。"""
 
-        self._connection_manager = ConnectionManager()
-        self._initialized = False
+        self._db_path = Path(db_path) if db_path else Path.cwd() / "data" / "az_data.sqlite3"
+        self._engine: Engine | None = None
 
     def initialize(self) -> None:
-        """共有SQLite接続を初期化する。"""
+        """共有 Engine を初期化する。"""
 
-        if self._initialized:
+        if self._engine is not None:
             return
 
-        self._connection_manager.initialize()
-        self._initialized = True
+        self._engine = create_database_engine(self._db_path)
+
+    def get_engine(self) -> Engine:
+        """初期化済みの共有 Engine を返す。"""
+
+        if self._engine is None:
+            self.initialize()
+        if self._engine is None:
+            raise RuntimeError("Database engine が初期化されていません。")
+        return self._engine
+
+    def dispose(self) -> None:
+        """共有 Engine を破棄する。"""
+
+        if self._engine is None:
+            return
+
+        self._engine.dispose()
+        self._engine = None
 
     def close(self) -> None:
-        """共有SQLite接続を閉じる。"""
+        """互換用の終了処理。新規実装では dispose() を使う。"""
 
-        self._connection_manager.close()
-        self._initialized = False
-
-    def get_connection(self) -> Connection:
-        """初期化済みの共有SQLite接続を返す。"""
-
-        self.initialize()
-        return self._connection_manager.get_connection()
+        self.dispose()

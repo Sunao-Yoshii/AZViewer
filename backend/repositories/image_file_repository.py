@@ -3,7 +3,10 @@ from __future__ import annotations
 import hashlib
 from dataclasses import replace
 from math import ceil
-from sqlite3 import Connection
+from typing import Iterable, Sequence
+
+from sqlalchemy import text
+from sqlalchemy.engine import Engine
 
 from backend.models import (
     DuplicateTagSetItem,
@@ -20,13 +23,164 @@ from backend.models import (
 )
 
 
+class _QueryResult:
+    """Repository 内の既存 fetch API と rowcount 利用を吸収する結果ラッパー。"""
+
+    def __init__(
+        self,
+        *,
+        rows: list[dict[str, object]] | None = None,
+        rowcount: int = -1,
+        lastrowid: int | None = None,
+    ) -> None:
+        self._rows = rows or []
+        self.rowcount = rowcount
+        self.lastrowid = lastrowid
+
+    def fetchall(self) -> list[dict[str, object]]:
+        return self._rows
+
+    def fetchone(self) -> dict[str, object] | None:
+        if not self._rows:
+            return None
+        return self._rows[0]
+
+
+class _SqlAlchemyRepositoryConnection:
+    """SQLAlchemy Engine の短命 Connection を既存 Repository API に寄せるアダプタ。"""
+
+    def __init__(self, engine: Engine) -> None:
+        self._engine = engine
+        self._active_connection = None
+        self._active_transaction = None
+
+    def execute(self, sql: str, params: object | None = None) -> _QueryResult:
+        statement = sql.strip()
+        upper_statement = statement.upper()
+        if upper_statement == "BEGIN":
+            self._begin()
+            return _QueryResult(rowcount=0)
+
+        translated_sql, translated_params = self._translate_parameters(sql, params)
+        if self._active_connection is not None:
+            return self._execute_on_connection(self._active_connection, translated_sql, translated_params)
+
+        if self._is_read_statement(statement):
+            with self._engine.connect() as conn:
+                return self._execute_on_connection(conn, translated_sql, translated_params)
+
+        with self._engine.begin() as conn:
+            return self._execute_on_connection(conn, translated_sql, translated_params)
+
+    def executemany(self, sql: str, params: Iterable[object]) -> _QueryResult:
+        params_list = list(params)
+        translated_sql, translated_params = self._translate_many_parameters(sql, params_list)
+        if self._active_connection is not None:
+            return self._execute_on_connection(self._active_connection, translated_sql, translated_params)
+
+        with self._engine.begin() as conn:
+            return self._execute_on_connection(conn, translated_sql, translated_params)
+
+    def commit(self) -> None:
+        if self._active_transaction is None:
+            return
+
+        transaction = self._active_transaction
+        connection = self._active_connection
+        self._active_transaction = None
+        self._active_connection = None
+        try:
+            transaction.commit()
+        finally:
+            connection.close()
+
+    def rollback(self) -> None:
+        if self._active_transaction is None:
+            return
+
+        transaction = self._active_transaction
+        connection = self._active_connection
+        self._active_transaction = None
+        self._active_connection = None
+        try:
+            transaction.rollback()
+        finally:
+            connection.close()
+
+    def _begin(self) -> None:
+        if self._active_transaction is not None:
+            raise RuntimeError("Transaction is already active.")
+
+        self._active_connection = self._engine.connect()
+        self._active_transaction = self._active_connection.begin()
+
+    def _execute_on_connection(self, connection, sql: str, params: object | None) -> _QueryResult:
+        result = connection.execute(text(sql), params or {})
+        rows = [dict(row) for row in result.mappings().all()] if result.returns_rows else []
+        return _QueryResult(
+            rows=rows,
+            rowcount=result.rowcount,
+            lastrowid=getattr(result, "lastrowid", None),
+        )
+
+    def _translate_parameters(self, sql: str, params: object | None) -> tuple[str, object | None]:
+        if params is None or isinstance(params, dict):
+            return sql, params
+
+        values = self._to_sequence(params)
+        return self._replace_qmark_parameters(sql, values)
+
+    def _translate_many_parameters(self, sql: str, params: list[object]) -> tuple[str, list[dict[str, object]]]:
+        if not params:
+            return sql, []
+
+        first = params[0]
+        if isinstance(first, dict):
+            return sql, [dict(item) for item in params if isinstance(item, dict)]
+
+        translated_sql, translated_params = self._replace_qmark_parameters(sql, self._to_sequence(first))
+        param_names = list(translated_params.keys())
+        return translated_sql, [
+            {name: value for name, value in zip(param_names, self._to_sequence(item), strict=True)}
+            for item in params
+        ]
+
+    def _replace_qmark_parameters(self, sql: str, values: Sequence[object]) -> tuple[str, dict[str, object]]:
+        translated_sql_parts: list[str] = []
+        params: dict[str, object] = {}
+        value_index = 0
+
+        for character in sql:
+            if character != "?":
+                translated_sql_parts.append(character)
+                continue
+            param_name = f"p_{value_index}"
+            translated_sql_parts.append(f":{param_name}")
+            params[param_name] = values[value_index]
+            value_index += 1
+
+        if value_index != len(values):
+            raise ValueError("SQL placeholder count does not match parameter count.")
+        return "".join(translated_sql_parts), params
+
+    def _to_sequence(self, params: object) -> Sequence[object]:
+        if isinstance(params, Sequence) and not isinstance(params, (str, bytes, bytearray)):
+            return params
+        return (params,)
+
+    def _is_read_statement(self, statement: str) -> bool:
+        upper_statement = statement.upper()
+        return upper_statement.startswith(("SELECT", "WITH", "PRAGMA"))
+
+
 class ImageFileRepository:
     """画像ファイル情報を保存するSQLiteテーブルへのアクセスを担当する。"""
 
-    def __init__(self, connection: Connection) -> None:
-        """リポジトリで利用するSQLite接続を保持する。"""
+    def __init__(self, engine: Engine) -> None:
+        """リポジトリで利用する SQLAlchemy Engine を保持する。"""
 
-        self._connection = connection
+        self._engine = engine
+        self._connection = _SqlAlchemyRepositoryConnection(engine)
 
     def create_table(self) -> None:
         """画像ファイル情報を保存するテーブルを作成する。"""
@@ -226,13 +380,18 @@ class ImageFileRepository:
             return []
 
         record_ids = self.find_ids_by_paths(paths)
-        self.delete_tag_hashes(record_ids)
-
-        self._connection.executemany(
-            "DELETE FROM image_file_data WHERE path = ?",
-            [(path,) for path in paths],
-        )
-        return record_ids
+        try:
+            self._connection.execute("BEGIN")
+            self.delete_tag_hashes(record_ids)
+            self._connection.executemany(
+                "DELETE FROM image_file_data WHERE path = ?",
+                [(path,) for path in paths],
+            )
+            self._connection.commit()
+            return record_ids
+        except Exception:
+            self._connection.rollback()
+            raise
 
     def insert_many(self, records: list[ImageFileRecord]) -> None:
         """複数の画像ファイル情報を一括登録する。"""
@@ -800,6 +959,7 @@ class ImageFileRepository:
             return 0
 
         try:
+            self._connection.execute("BEGIN")
             cursor = self._connection.executemany(
                 """
                 UPDATE image_file_data
@@ -823,6 +983,7 @@ class ImageFileRepository:
         """指定IDのファイル名、パス、フォルダ名を更新する。"""
 
         try:
+            self._connection.execute("BEGIN")
             cursor = self._connection.execute(
                 """
                 UPDATE image_file_data
@@ -862,6 +1023,7 @@ class ImageFileRepository:
         """
 
         try:
+            self._connection.execute("BEGIN")
             cursor = self._connection.execute(sql, params)
             updated_count = cursor.rowcount
             self._connection.commit()
@@ -883,21 +1045,51 @@ class ImageFileRepository:
         """指定レコードの詳細項目を一括更新する。"""
 
         self._validate_detail_values(rating, is_checked, is_favorite)
-        cursor = self._connection.execute(
-            """
-            UPDATE image_file_data
-            SET
-                rating = ?,
-                is_checked = ?,
-                is_favorite = ?,
-                comment = ?
-            WHERE id = ?
-            """,
-            (rating, is_checked, is_favorite, comment, record_id),
-        )
-        if commit:
+        try:
+            if commit:
+                self._connection.execute("BEGIN")
+            cursor = self._connection.execute(
+                """
+                UPDATE image_file_data
+                SET
+                    rating = ?,
+                    is_checked = ?,
+                    is_favorite = ?,
+                    comment = ?
+                WHERE id = ?
+                """,
+                (rating, is_checked, is_favorite, comment, record_id),
+            )
+            if commit:
+                self._connection.commit()
+            return cursor.rowcount > 0
+        except Exception:
+            if commit:
+                self._connection.rollback()
+            raise
+
+    def update_detail_with_tags_and_model(
+        self,
+        detail: dict[str, object],
+        tags: list[str],
+        model_name: str | None,
+    ) -> bool:
+        """詳細項目、タグリンク、モデルリンクを1トランザクションで更新する。"""
+
+        try:
+            self._connection.execute("BEGIN")
+            updated = self.update_detail(**detail, commit=False)
+            if not updated:
+                self._connection.rollback()
+                return False
+            record_id = int(detail["record_id"])
+            self.replace_tags(record_id, tags)
+            self.replace_image_model(record_id, model_name)
             self._connection.commit()
-        return cursor.rowcount > 0
+            return True
+        except Exception:
+            self._connection.rollback()
+            raise
 
     def find_tags_by_image_ids(self, image_ids: list[int]) -> dict[int, list[str]]:
         """画像ID群に紐づくタグ一覧をまとめて取得する。"""
@@ -1117,18 +1309,23 @@ class ImageFileRepository:
     def rebuild_all_tag_hashes(self) -> int:
         """既存タグリンクからtag_hashを全件再構築し、作成件数を返す。"""
 
-        self._connection.execute("DELETE FROM tag_hash")
-        rows = self._connection.execute(
-            """
-            SELECT DISTINCT image_file_id
-            FROM tag_image_link
-            ORDER BY image_file_id ASC
-            """
-        ).fetchall()
-        for row in rows:
-            self.replace_tag_hash(int(row["image_file_id"]))
-        self._connection.commit()
-        return len(rows)
+        try:
+            self._connection.execute("BEGIN")
+            self._connection.execute("DELETE FROM tag_hash")
+            rows = self._connection.execute(
+                """
+                SELECT DISTINCT image_file_id
+                FROM tag_image_link
+                ORDER BY image_file_id ASC
+                """
+            ).fetchall()
+            for row in rows:
+                self.replace_tag_hash(int(row["image_file_id"]))
+            self._connection.commit()
+            return len(rows)
+        except Exception:
+            self._connection.rollback()
+            raise
 
     def ensure_tag_hashes_if_empty(self) -> int:
         """tag_hashが空の場合だけ全件再構築し、再構築件数を返す。"""

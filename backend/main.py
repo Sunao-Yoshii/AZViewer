@@ -116,6 +116,8 @@ def smoke_test_runtime() -> int:
 
     try:
         import clr  # noqa: F401
+        import greenlet  # noqa: F401
+        import sqlalchemy  # noqa: F401
         import webview.platforms.winforms  # noqa: F401
     except Exception as exc:
         print(f"Runtime smoke test failed: {exc}", file=sys.stderr)

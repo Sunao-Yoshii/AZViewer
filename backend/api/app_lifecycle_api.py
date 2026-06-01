@@ -85,9 +85,9 @@ class AppLifeCycleApi:
         ).to_dict()
 
     def close(self) -> None:
-        """アプリケーション終了時に保持している接続を閉じる。"""
+        """アプリケーション終了時に保持している Engine を破棄する。"""
 
-        self._database_lifecycle_manager.close()
+        self._database_lifecycle_manager.dispose()
 
     def _run_startup_cleanup(self) -> dict[str, Any] | None:
         """起動時整合性確認を同期実行し、必要時のみ通知情報を返す。"""
@@ -121,11 +121,10 @@ class AppLifeCycleApi:
         if self._cleanup_service is not None:
             return self._cleanup_service
 
-        connection = self._database_lifecycle_manager.get_connection()
-        self._repository = ImageFileRepository(connection)
+        engine = self._database_lifecycle_manager.get_engine()
+        self._repository = ImageFileRepository(engine)
         self._repository.create_table()
         self._cleanup_service = StartupCleanupService(
-            connection,
             self._repository,
             self._thumbnail_cache_service,
         )
@@ -143,7 +142,7 @@ class AppLifeCycleApi:
         if self._repository is not None:
             return self._repository
 
-        connection = self._database_lifecycle_manager.get_connection()
-        self._repository = ImageFileRepository(connection)
+        engine = self._database_lifecycle_manager.get_engine()
+        self._repository = ImageFileRepository(engine)
         self._repository.create_table()
         return self._repository

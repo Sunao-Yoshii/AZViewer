@@ -274,6 +274,8 @@ try {
         --collect-all "cffi" `
         --collect-all "PIL" `
         --collect-all "send2trash" `
+        --collect-all "sqlalchemy" `
+        --collect-all "greenlet" `
         --add-data "frontend\dist;frontend\dist" `
         "backend\main.py"
 }

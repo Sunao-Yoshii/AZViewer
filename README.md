@@ -232,6 +232,7 @@ python backend\main.py
 - clr-loader 0.2.10
 - Pillow 11 系
 - send2trash
+- SQLAlchemy 2
 - PyInstaller 6.20.0
 - Vue 3.5
 - Vite 6

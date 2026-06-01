@@ -764,8 +764,8 @@ class ImageCatalogApi:
         if self._repository is not None:
             return self._repository
 
-        connection = self._database_lifecycle_manager.get_connection()
-        self._repository = ImageFileRepository(connection)
+        engine = self._database_lifecycle_manager.get_engine()
+        self._repository = ImageFileRepository(engine)
         self._repository.create_table()
         return self._repository
 
@@ -1459,21 +1459,8 @@ class ImageCatalogApi:
     ) -> bool:
         """詳細項目、タグリンク、モデルリンクを同一トランザクションで更新する。"""
 
-        connection = self._database_lifecycle_manager.get_connection()
         repository = self._get_repository()
-        try:
-            connection.execute("BEGIN")
-            updated = repository.update_detail(**detail, commit=False)
-            if not updated:
-                connection.rollback()
-                return False
-            repository.replace_tags(int(detail["record_id"]), tags)
-            repository.replace_image_model(int(detail["record_id"]), model_name)
-            connection.commit()
-            return True
-        except Exception:
-            connection.rollback()
-            raise
+        return repository.update_detail_with_tags_and_model(detail, tags, model_name)
 
     def _normalize_detail_comment(self, value: object) -> str | None:
         """詳細更新コメントをDB保存値へ正規化する。"""
