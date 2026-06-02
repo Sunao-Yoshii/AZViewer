@@ -45,6 +45,9 @@ LOGGER = logging.getLogger(__name__)
 class ImageCatalogApi:
     """画像一覧表示・検索・更新系APIを提供する。"""
 
+    _ALLOWED_PAGE_SIZES = {25, 50, 75, 100, 200, 500, 1000, 2500}
+    _DEFAULT_PAGE_SIZE = 25
+
     def __init__(
         self,
         database_lifecycle_manager: DatabaseLifecycleManager,
@@ -80,8 +83,8 @@ class ImageCatalogApi:
             tag_hash=tag_hash,
             tag_set=tag_set,
             tag_keyword=self._normalize_search_tag_keyword(data.get("tag_keyword")),
-            page=int(data.get("page", 1) or 1),
-            page_size=int(data.get("page_size", 25) or 25),
+            page=self._normalize_page(data.get("page")),
+            page_size=self._normalize_page_size(data.get("page_size")),
             sort=str(data.get("sort", "id_desc") or "id_desc"),
         )
         return ApiResponse(
@@ -794,6 +797,27 @@ class ImageCatalogApi:
             return None
         normalized = str(value).strip()
         return normalized or None
+
+    def _normalize_page(self, value: object) -> int:
+        """検索ページ番号を1以上の整数へ正規化する。"""
+
+        try:
+            page = int(value or 1)
+        except (TypeError, ValueError):
+            return 1
+        return max(1, page)
+
+    def _normalize_page_size(self, value: object) -> int:
+        """検索ページサイズを許可リスト内の値へ正規化する。"""
+
+        try:
+            page_size = int(value or self._DEFAULT_PAGE_SIZE)
+        except (TypeError, ValueError):
+            return self._DEFAULT_PAGE_SIZE
+
+        if page_size not in self._ALLOWED_PAGE_SIZES:
+            return self._DEFAULT_PAGE_SIZE
+        return page_size
 
     def _normalize_search_tags(self, value: object) -> list[str]:
         """検索条件用タグを空文字・重複除去し、最大3件へ丸める。"""

@@ -1,15 +1,27 @@
 import { nextTick, ref } from 'vue'
-import placeholderUrl from '../assets/images/placeholder.svg'
 import {
   callBackendApi,
-  fetchLocalImageThumb,
   searchImageFiles,
 } from '../services/backendApi'
+
+export const PAGE_SIZE_OPTIONS = [25, 50, 75, 100, 200, 500, 1000, 2500]
+export const LARGE_PAGE_SIZE_THRESHOLD = 500
+export const CONFIRM_PAGE_SIZE_THRESHOLD = 1000
 
 function waitForNextPaint() {
   return new Promise((resolve) => {
     window.requestAnimationFrame(() => resolve())
   })
+}
+
+function normalizePageSize(value) {
+  const pageSize = Number(value)
+  return PAGE_SIZE_OPTIONS.includes(pageSize) ? pageSize : 25
+}
+
+function normalizePage(value) {
+  const page = Number(value)
+  return Number.isFinite(page) ? Math.max(1, Math.trunc(page)) : 1
 }
 
 export function useImageSearch({ pushToast, setStatus, loading }) {
@@ -54,26 +66,14 @@ export function useImageSearch({ pushToast, setStatus, loading }) {
       tag_hash: merged.tagHash || null,
       tag_set: merged.tagSet || null,
       tag_keyword: String(merged.tag_keyword ?? '').trim() || null,
-      page: merged.page,
-      page_size: merged.page_size,
+      page: normalizePage(merged.page),
+      page_size: normalizePageSize(merged.page_size),
       sort: merged.sort,
     }
   }
 
-  async function addThumbnailUrl(item) {
-    const result = await fetchLocalImageThumb(item.id)
-    if (!result.success) {
-      return { ...item, thumbnailUrl: placeholderUrl }
-    }
-    return { ...item, thumbnailUrl: result.data?.dataUrl || placeholderUrl }
-  }
-
-  async function addThumbnailUrls(items) {
-    return await Promise.all(items.map(addThumbnailUrl))
-  }
-
   async function applySearchResult(data, appliedPayload) {
-    const items = await addThumbnailUrls(data.items ?? [])
+    const items = [...(data.items ?? [])]
     filters.value = {
       ...filters.value,
       path: appliedPayload.path ?? '',
@@ -176,23 +176,35 @@ export function useImageSearch({ pushToast, setStatus, loading }) {
 
   async function handleSearch() {
     clearDuplicateTagSetCondition()
-    await executeSearch({ page: 1 }, true)
+    return await executeSearch({ page: 1 }, true)
   }
 
   async function handleImportComplete() {
-    await executeSearch({}, true)
+    return await executeSearch({}, true)
   }
 
   async function handlePageChange(page) {
-    await executeSearch({ page }, true)
+    return await executeSearch({ page }, true)
   }
 
   async function handlePageSizeChange(pageSize) {
-    await executeSearch({ page: 1, page_size: pageSize }, true)
+    const nextPageSize = normalizePageSize(pageSize)
+    if (nextPageSize >= CONFIRM_PAGE_SIZE_THRESHOLD) {
+      const confirmed = window.confirm(
+        '1000件以上を表示すると、画像数や端末性能によって動作が重くなる場合があります。\nページサイズを変更しますか？'
+      )
+
+      if (!confirmed) {
+        return { cancelled: true }
+      }
+    }
+
+    const changed = await executeSearch({ page: 1, page_size: nextPageSize }, true)
+    return { changed }
   }
 
   async function handleSortChange(sort) {
-    await executeSearch({ page: 1, sort }, true)
+    return await executeSearch({ page: 1, sort }, true)
   }
 
   return {

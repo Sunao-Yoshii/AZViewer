@@ -176,6 +176,9 @@ class _SqlAlchemyRepositoryConnection:
 class ImageFileRepository:
     """画像ファイル情報を保存するSQLiteテーブルへのアクセスを担当する。"""
 
+    _ALLOWED_PAGE_SIZES = {25, 50, 75, 100, 200, 500, 1000, 2500}
+    _DEFAULT_PAGE_SIZE = 25
+
     def __init__(self, engine: Engine) -> None:
         """リポジトリで利用する SQLAlchemy Engine を保持する。"""
 
@@ -518,8 +521,8 @@ class ImageFileRepository:
     ) -> SearchImageFilesResult:
         """条件に一致する画像一覧をページング付きで取得する。"""
 
-        safe_page = max(1, int(page))
-        safe_page_size = max(1, int(page_size))
+        safe_page = self._normalize_page(page)
+        safe_page_size = self._normalize_page_size(page_size)
         where_clauses, params = self._build_search_conditions(
             path=path,
             rating=rating,
@@ -1873,6 +1876,27 @@ class ImageFileRepository:
         if isinstance(value, bool):
             return value
         return int(value) == 1
+
+    def _normalize_page(self, value: object) -> int:
+        """ページ番号を1以上の整数へ丸める。"""
+
+        try:
+            page = int(value or 1)
+        except (TypeError, ValueError):
+            return 1
+        return max(1, page)
+
+    def _normalize_page_size(self, value: object) -> int:
+        """ページサイズを許可リスト内の値へ丸める。"""
+
+        try:
+            page_size = int(value or self._DEFAULT_PAGE_SIZE)
+        except (TypeError, ValueError):
+            return self._DEFAULT_PAGE_SIZE
+
+        if page_size not in self._ALLOWED_PAGE_SIZES:
+            return self._DEFAULT_PAGE_SIZE
+        return page_size
 
     def _validate_detail_values(self, rating: str, is_checked: int, is_favorite: int) -> None:
         """詳細更新で許可する値か検証する。"""

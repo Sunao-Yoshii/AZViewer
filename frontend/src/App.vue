@@ -36,10 +36,10 @@ const renameModal = reactive({
 })
 const selectedImageIds = computed(() => [...selectedImageIdSet.value])
 const selectedCount = computed(() => selectedImageIds.value.length)
-const visibleImageIds = computed(() => (searchResult.value.items ?? []).map((item) => item.id))
-const visibleCount = computed(() => visibleImageIds.value.length)
-const isAllVisibleSelected = computed(() => {
-  const ids = visibleImageIds.value
+const currentPageImageIds = computed(() => (searchResult.value.items ?? []).map((item) => item.id))
+const currentPageCount = computed(() => currentPageImageIds.value.length)
+const isAllCurrentPageSelected = computed(() => {
+  const ids = currentPageImageIds.value
 
   if (ids.length === 0) {
     return false
@@ -131,8 +131,8 @@ function handleSelectionChange({ id, selected }) {
   selectedImageIdSet.value = next
 }
 
-function handleToggleVisibleSelection() {
-  const ids = visibleImageIds.value
+function handleToggleCurrentPageSelection() {
+  const ids = currentPageImageIds.value
 
   if (ids.length === 0) {
     return
@@ -140,7 +140,7 @@ function handleToggleVisibleSelection() {
 
   const next = new Set(selectedImageIdSet.value)
 
-  if (isAllVisibleSelected.value) {
+  if (isAllCurrentPageSelected.value) {
     ids.forEach((id) => next.delete(id))
   } else {
     ids.forEach((id) => next.add(id))
@@ -160,18 +160,27 @@ async function handleImportCompleteWithSelectionClear() {
 }
 
 async function handlePageChangeWithSelectionClear(page) {
-  clearSelection()
-  await handlePageChange(page)
+  const changed = await handlePageChange(page)
+  if (changed !== false) {
+    clearSelection()
+  }
 }
 
 async function handlePageSizeChangeWithSelectionClear(pageSize) {
-  clearSelection()
-  await handlePageSizeChange(pageSize)
+  const result = await handlePageSizeChange(pageSize)
+  if (result?.cancelled) {
+    return
+  }
+  if (result?.changed !== false) {
+    clearSelection()
+  }
 }
 
 async function handleSortChangeWithSelectionClear(sort) {
-  clearSelection()
-  await handleSortChange(sort)
+  const changed = await handleSortChange(sort)
+  if (changed !== false) {
+    clearSelection()
+  }
 }
 
 async function handleOpenDetail(item) {
@@ -432,13 +441,13 @@ onBeforeUnmount(() => {
     :is-searching="isSearching || isImportingPromptTags"
     :selected-count="selectedCount"
     :selected-image-ids="selectedImageIds"
-    :visible-count="visibleCount"
-    :is-all-visible-selected="isAllVisibleSelected"
+    :current-page-count="currentPageCount"
+    :is-all-current-page-selected="isAllCurrentPageSelected"
     @search="handleSearchWithSelectionClear"
     @import-complete="handleImportCompleteWithSelectionClear"
     @import-prompt-tags="handleImportPromptTags"
     @import-caption-tags="handleImportCaptionTags"
-    @toggle-visible-selection="handleToggleVisibleSelection"
+    @toggle-current-page-selection="handleToggleCurrentPageSelection"
     @remove-selected-images-from-catalog="handleRemoveSelectedImagesFromCatalog"
     @move-selected-images-to-trash="handleMoveSelectedImagesToTrash"
     @move-selected-images="handleMoveSelectedImages"

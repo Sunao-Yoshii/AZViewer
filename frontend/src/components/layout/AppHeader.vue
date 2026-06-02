@@ -12,11 +12,11 @@ defineProps({
     type: Number,
     default: 0,
   },
-  visibleCount: {
+  currentPageCount: {
     type: Number,
     default: 0,
   },
-  isAllVisibleSelected: {
+  isAllCurrentPageSelected: {
     type: Boolean,
     default: false,
   },
@@ -33,7 +33,7 @@ defineEmits([
   'import-caption-tags',
   'open-bulk-tag-add',
   'open-duplicate-tag-sets',
-  'toggle-visible-selection',
+  'toggle-current-page-selection',
   'open-master-maintenance',
 ])
 </script>
@@ -46,10 +46,14 @@ defineEmits([
         <button
           type="button"
           class="btn btn-outline-secondary btn-sm"
-          :disabled="isBusy || visibleCount === 0"
-          @click="$emit('toggle-visible-selection')"
+          :disabled="isBusy || currentPageCount === 0"
+          @click="$emit('toggle-current-page-selection')"
         >
-          {{ isAllVisibleSelected ? '表示中の選択を解除' : `表示中をすべて選択 (${visibleCount})` }}
+          {{
+            isAllCurrentPageSelected
+              ? '現在ページの選択を解除'
+              : `現在ページをすべて選択 (${currentPageCount})`
+          }}
         </button>
         <button
           type="button"

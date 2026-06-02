@@ -1,7 +1,8 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import placeholderUrl from '../../assets/images/placeholder.svg'
 import { useImageMetadata } from '../../composables/useImageMetadata'
+import { fetchLocalImageThumb } from '../../services/backendApi'
 import ImageMetadataModal from './ImageMetadataModal.vue'
 import TileDisplay from './display.vue'
 import TileEdit from './edit.vue'
@@ -29,6 +30,8 @@ const emit = defineEmits(['edit-finished', 'open-detail', 'save-detail', 'select
 
 const isEditing = ref(false)
 const editRef = ref(null)
+const thumbnailUrl = ref(props.item.thumbnailUrl || placeholderUrl)
+let thumbnailLoadToken = 0
 const {
   metadataModal,
   openMetadataModal,
@@ -52,6 +55,36 @@ watch(
     }
   }
 )
+
+watch(
+  () => props.item.id,
+  () => {
+    loadThumbnail(props.item)
+  },
+  { immediate: true }
+)
+
+onBeforeUnmount(() => {
+  thumbnailLoadToken += 1
+})
+
+async function loadThumbnail(item) {
+  const token = ++thumbnailLoadToken
+  thumbnailUrl.value = item?.thumbnailUrl || placeholderUrl
+
+  if (!item?.id || item.thumbnailUrl) {
+    return
+  }
+
+  const result = await fetchLocalImageThumb(item.id)
+  if (token !== thumbnailLoadToken) {
+    return
+  }
+
+  thumbnailUrl.value = result.success
+    ? result.data?.dataUrl || placeholderUrl
+    : placeholderUrl
+}
 
 function handleSave(payload) {
   emit('save-detail', payload)
@@ -81,7 +114,7 @@ function applyMetadataTextToTagInput(value) {
     <article :id="`image-tile-${item.id}`" class="card image-tile">
       <img
         class="image-tile-thumb"
-        :src="item.thumbnailUrl || placeholderUrl"
+        :src="thumbnailUrl"
         :alt="item.filename"
         role="button"
         @click="$emit('open-detail', item)"

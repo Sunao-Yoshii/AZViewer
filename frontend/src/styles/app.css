@@ -638,6 +638,23 @@ body {
   font-weight: 700;
 }
 
+.image-page-size-warning {
+  font-size: 0.875rem;
+}
+
+.image-chunk-rendering-message {
+  font-size: 0.875rem;
+}
+
+.pagination-nav {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.pagination-nav .btn-group {
+  flex-wrap: nowrap;
+}
+
 @keyframes startup-overlay-spin {
   from {
     transform: rotate(0deg);

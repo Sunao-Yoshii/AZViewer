@@ -28,11 +28,11 @@ defineProps({
     type: Array,
     default: () => [],
   },
-  visibleCount: {
+  currentPageCount: {
     type: Number,
     default: 0,
   },
-  isAllVisibleSelected: {
+  isAllCurrentPageSelected: {
     type: Boolean,
     default: false,
   },
@@ -43,7 +43,7 @@ defineEmits([
   'import-complete',
   'import-prompt-tags',
   'import-caption-tags',
-  'toggle-visible-selection',
+  'toggle-current-page-selection',
   'export-selected-tags',
   'move-selected-images',
   'move-selected-images-to-trash',
@@ -68,11 +68,11 @@ defineEmits([
       :app-info="appInfo"
       :is-busy="isSearching"
       :selected-count="selectedCount"
-      :visible-count="visibleCount"
-      :is-all-visible-selected="isAllVisibleSelected"
+      :current-page-count="currentPageCount"
+      :is-all-current-page-selected="isAllCurrentPageSelected"
       @import-prompt-tags="$emit('import-prompt-tags')"
       @import-caption-tags="$emit('import-caption-tags')"
-      @toggle-visible-selection="$emit('toggle-visible-selection')"
+      @toggle-current-page-selection="$emit('toggle-current-page-selection')"
       @export-selected-tags="$emit('export-selected-tags')"
       @move-selected-images="$emit('move-selected-images')"
       @move-selected-images-to-trash="$emit('move-selected-images-to-trash')"
