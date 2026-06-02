@@ -76,6 +76,14 @@ export async function moveImageFilesToFolder(payload) {
   return await callBackendApi('move_image_files_to_folder', payload)
 }
 
+export async function removeFolderFromCatalog(payload) {
+  return await callBackendApi('remove_folder_from_catalog', payload)
+}
+
+export async function moveFolderToTrash(payload) {
+  return await callBackendApi('move_folder_to_trash', payload)
+}
+
 export async function removeImageFilesFromCatalog(payload) {
   return await callBackendApi('remove_image_files_from_catalog', payload)
 }

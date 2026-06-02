@@ -255,6 +255,15 @@ class ImageFolderMaintenanceItem:
 
 
 @dataclass(frozen=True)
+class ImageFolderReference:
+    """フォルダ単位操作で参照するフォルダ定義を表す。"""
+
+    id: int
+    name: str
+    path: str
+
+
+@dataclass(frozen=True)
 class UnusedFolderDeleteResult:
     """未使用フォルダマスタ削除処理の結果を表す。"""
 

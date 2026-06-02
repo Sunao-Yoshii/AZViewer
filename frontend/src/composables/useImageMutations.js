@@ -4,9 +4,11 @@ import {
   bulkUpdateImageFileAttributes,
   exportSelectedImageTags,
   importCaptionTags as importCaptionTagsApi,
+  moveFolderToTrash as moveFolderToTrashApi,
   moveImageFilesToTrash,
   moveImageFilesToFolder,
   openContainingFolder as openContainingFolderApi,
+  removeFolderFromCatalog as removeFolderFromCatalogApi,
   removeImageFilesFromCatalog,
   renameImageFile,
   selectFolderDialog,
@@ -35,11 +37,60 @@ function buildTrashMoveConfirmMessage(count) {
   ].join('\n')
 }
 
+function buildFolderCatalogRemovalConfirmMessage(folder) {
+  return [
+    '次のフォルダに属する登録済み画像を AZViewer の管理対象から除外します。',
+    '',
+    '対象フォルダ:',
+    folder.path,
+    '',
+    `対象画像: ${folder.imageCount ?? 0} 件`,
+    '',
+    'この操作では、AZViewer 上の登録情報、タグ関連情報、モデル関連情報、サムネイルキャッシュを削除します。',
+    '実際の画像ファイルは削除されません。',
+    '',
+    '実行しますか？',
+  ].join('\n')
+}
+
+function buildFolderTrashMoveConfirmMessage(folder) {
+  return [
+    '次のフォルダに属する登録済み画像を OS のごみ箱へ移動します。',
+    '',
+    '対象フォルダ:',
+    folder.path,
+    '',
+    `対象画像: ${folder.imageCount ?? 0} 件`,
+    '',
+    'ごみ箱への移動に成功した画像は、AZViewer の管理対象からも除外されます。',
+    'AZViewer に登録されていないファイルは対象にしません。',
+    '環境によっては、ごみ箱から復元できない場合があります。',
+    '',
+    '実行しますか？',
+  ].join('\n')
+}
+
 function pushCatalogRemovalResultToast(pushToast, result, targetCount) {
   const data = result?.data ?? {}
   pushToast({
     type: 'success',
     message: `選択画像を管理対象から除外しました。対象: ${data.targetCount ?? targetCount} 件 / 除外: ${data.removedCount ?? 0} 件 / 失敗: ${data.failedCount ?? 0} 件`,
+  })
+}
+
+function pushFolderCatalogRemovalResultToast(pushToast, result) {
+  const data = result?.data ?? {}
+  pushToast({
+    type: (data.failedCount ?? 0) > 0 ? 'warning' : 'success',
+    message: `フォルダ内の画像を管理対象から除外しました。対象: ${data.targetCount ?? 0} 件 / 除外: ${data.removedCount ?? 0} 件 / 失敗: ${data.failedCount ?? 0} 件`,
+  })
+}
+
+function pushFolderTrashMoveResultToast(pushToast, result) {
+  const data = result?.data ?? {}
+  pushToast({
+    type: (data.failedCount ?? 0) > 0 ? 'warning' : 'success',
+    message: `フォルダ内画像をごみ箱へ移動しました。対象: ${data.targetCount ?? 0} 件 / 移動: ${data.trashedCount ?? 0} 件 / 失敗: ${data.failedCount ?? 0} 件`,
   })
 }
 
@@ -387,6 +438,70 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     }
   }
 
+  async function removeFolderFromCatalog({ folder, refresh: refreshSelected, clearSelection }) {
+    if (!folder?.id) {
+      pushToast({ type: 'warning', message: '操作対象のフォルダを選択してください。' })
+      return
+    }
+
+    if (!window.confirm(buildFolderCatalogRemovalConfirmMessage(folder))) {
+      return
+    }
+
+    loading?.showLoading(
+      'フォルダを管理対象から除外中',
+      '対象フォルダ内の登録情報を AZViewer から除外しています。'
+    )
+
+    try {
+      const result = await removeFolderFromCatalogApi({ folderId: folder.id })
+      if (!result?.success) {
+        pushToast({ type: 'danger', message: result?.message || 'フォルダの管理対象除外に失敗しました。' })
+        return
+      }
+
+      pushFolderCatalogRemovalResultToast(pushToast, result)
+      clearSelection?.()
+      await refreshSelected?.()
+    } catch {
+      pushToast({ type: 'danger', message: 'フォルダの管理対象除外に失敗しました。' })
+    } finally {
+      loading?.hideLoading()
+    }
+  }
+
+  async function moveFolderToTrash({ folder, refresh: refreshSelected, clearSelection }) {
+    if (!folder?.id) {
+      pushToast({ type: 'warning', message: '操作対象のフォルダを選択してください。' })
+      return
+    }
+
+    if (!window.confirm(buildFolderTrashMoveConfirmMessage(folder))) {
+      return
+    }
+
+    loading?.showLoading(
+      'フォルダ内画像をごみ箱へ移動中',
+      '対象フォルダ内の登録済み画像をごみ箱へ移動し、登録情報を整理しています。'
+    )
+
+    try {
+      const result = await moveFolderToTrashApi({ folderId: folder.id })
+      if (!result?.success) {
+        pushToast({ type: 'danger', message: result?.message || 'フォルダ内画像のごみ箱移動に失敗しました。' })
+        return
+      }
+
+      pushFolderTrashMoveResultToast(pushToast, result)
+      clearSelection?.()
+      await refreshSelected?.()
+    } catch {
+      pushToast({ type: 'danger', message: 'フォルダ内画像のごみ箱移動に失敗しました。' })
+    } finally {
+      loading?.hideLoading()
+    }
+  }
+
   async function moveSelectedImages({ ids, refresh: refreshSelected, clearSelection }) {
     const targetIds = [...(ids ?? [])]
     if (targetIds.length === 0) {
@@ -580,12 +695,14 @@ export function useImageMutations({ pushToast, refresh, loading }) {
     handleSaveDetail,
     importCaptionTags,
     moveSelectedImages,
+    moveFolderToTrash,
     moveSelectedImagesToTrash,
     moveSingleImageToTrash,
     openBulkAttributeEditModal,
     openBulkTagAddModal,
     openContainingFolder,
     renameSingleImageFile,
+    removeFolderFromCatalog,
     removeSelectedImagesFromCatalog,
     saveBulkAttributeEdit,
     saveBulkTagAdd,

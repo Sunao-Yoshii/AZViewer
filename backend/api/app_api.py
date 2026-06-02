@@ -125,6 +125,16 @@ class AppApi:
 
         return self._image_catalog_api.move_image_files_to_folder(payload)
 
+    def remove_folder_from_catalog(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """指定フォルダ内の登録済み画像を管理対象から除外する。"""
+
+        return self._image_catalog_api.remove_folder_from_catalog(payload)
+
+    def move_folder_to_trash(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """指定フォルダ内の登録済み画像をごみ箱へ移動する。"""
+
+        return self._image_catalog_api.move_folder_to_trash(payload)
+
     def export_selected_image_tags(self, payload: dict[str, object] | None = None) -> dict[str, object]:
         """指定レコードのタグを画像ごとのcaptionファイルへ出力する。"""
 

@@ -285,6 +285,94 @@ class ImageCatalogApi:
                 data=self._empty_file_move_data(),
             ).to_dict()
 
+    def remove_folder_from_catalog(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定フォルダに紐づく登録済み画像を管理対象から除外する。"""
+
+        try:
+            folder_id = self._normalize_folder_id((payload or {}).get("folderId"))
+            if folder_id is None:
+                return ApiResponse(
+                    success=False,
+                    message="対象フォルダが指定されていません。",
+                    data=self._empty_folder_catalog_removal_data(),
+                ).to_dict()
+
+            repository = self._get_repository()
+            folder = repository.find_folder_by_id(folder_id)
+            if folder is None:
+                return ApiResponse(
+                    success=False,
+                    message="対象フォルダが見つかりません。",
+                    data=self._empty_folder_catalog_removal_data(),
+                ).to_dict()
+
+            image_ids = repository.find_image_ids_by_folder_id(folder_id)
+            if not image_ids:
+                return ApiResponse(
+                    success=False,
+                    message="対象フォルダに登録済み画像がありません。",
+                    data={
+                        **self._empty_folder_catalog_removal_data(),
+                        "folderId": folder.id,
+                        "folderName": folder.name,
+                        "folderPath": folder.path,
+                    },
+                ).to_dict()
+
+            result = self.remove_image_files_from_catalog({"ids": image_ids})
+            return self._convert_folder_catalog_removal_response(result, folder, len(image_ids))
+        except Exception:
+            LOGGER.exception("Failed to remove folder from catalog.")
+            return ApiResponse(
+                success=False,
+                message="フォルダの管理対象除外に失敗しました。",
+                data=self._empty_folder_catalog_removal_data(),
+            ).to_dict()
+
+    def move_folder_to_trash(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """指定フォルダに紐づく登録済み画像をごみ箱へ移動する。"""
+
+        try:
+            folder_id = self._normalize_folder_id((payload or {}).get("folderId"))
+            if folder_id is None:
+                return ApiResponse(
+                    success=False,
+                    message="対象フォルダが指定されていません。",
+                    data=self._empty_folder_trash_move_data(),
+                ).to_dict()
+
+            repository = self._get_repository()
+            folder = repository.find_folder_by_id(folder_id)
+            if folder is None:
+                return ApiResponse(
+                    success=False,
+                    message="対象フォルダが見つかりません。",
+                    data=self._empty_folder_trash_move_data(),
+                ).to_dict()
+
+            image_ids = repository.find_image_ids_by_folder_id(folder_id)
+            if not image_ids:
+                return ApiResponse(
+                    success=False,
+                    message="対象フォルダに登録済み画像がありません。",
+                    data={
+                        **self._empty_folder_trash_move_data(),
+                        "folderId": folder.id,
+                        "folderName": folder.name,
+                        "folderPath": folder.path,
+                    },
+                ).to_dict()
+
+            result = self.move_image_files_to_trash({"ids": image_ids})
+            return self._convert_folder_trash_move_response(result, folder, len(image_ids))
+        except Exception:
+            LOGGER.exception("Failed to move folder images to trash.")
+            return ApiResponse(
+                success=False,
+                message="フォルダ内画像のごみ箱移動に失敗しました。",
+                data=self._empty_folder_trash_move_data(),
+            ).to_dict()
+
     def export_selected_image_tags(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """指定レコードのタグを画像ごとのcaptionファイルへ出力する。"""
 
@@ -894,6 +982,11 @@ class ImageCatalogApi:
             return None
         return folder_id if folder_id > 0 else None
 
+    def _normalize_folder_id(self, value: object) -> int | None:
+        """フォルダ操作用IDを正の整数またはNoneへ正規化する。"""
+
+        return self._normalize_search_folder_id(value)
+
     def _normalize_search_model(self, value: object) -> str | None:
         """検索条件用モデル名を空文字ならNoneへ正規化する。"""
 
@@ -1152,6 +1245,33 @@ class ImageCatalogApi:
             failed_files=[],
         ).to_api_data()
 
+    def _empty_folder_catalog_removal_data(self) -> dict[str, object]:
+        """フォルダ単位管理対象除外API用の空結果データを返す。"""
+
+        return {
+            "folderId": None,
+            "folderName": "",
+            "folderPath": "",
+            "targetCount": 0,
+            "removedCount": 0,
+            "failedCount": 0,
+            "failedFiles": [],
+        }
+
+    def _empty_folder_trash_move_data(self) -> dict[str, object]:
+        """フォルダ単位ごみ箱移動API用の空結果データを返す。"""
+
+        return {
+            "folderId": None,
+            "folderName": "",
+            "folderPath": "",
+            "targetCount": 0,
+            "trashedCount": 0,
+            "removedCount": 0,
+            "failedCount": 0,
+            "failedFiles": [],
+        }
+
     def _empty_wildcard_export_data(self) -> dict[str, object]:
         """ワイルドカード出力API用の空結果データを返す。"""
 
@@ -1219,6 +1339,63 @@ class ImageCatalogApi:
             failed_count=max(0, len(record_ids) - removed_count),
             failed_files=[],
         )
+
+    def _convert_folder_catalog_removal_response(
+        self,
+        result: dict[str, Any],
+        folder,
+        target_count: int,
+    ) -> dict[str, Any]:
+        """画像単位除外APIの結果をフォルダ単位操作のレスポンスへ変換する。"""
+
+        data = result.get("data") or {}
+        failed_files = data.get("failedFiles") or []
+        return ApiResponse(
+            success=bool(result.get("success")),
+            message=(
+                "フォルダ内の画像を管理対象から除外しました。"
+                if result.get("success")
+                else result.get("message") or "フォルダの管理対象除外に失敗しました。"
+            ),
+            data={
+                "folderId": folder.id,
+                "folderName": folder.name,
+                "folderPath": folder.path,
+                "targetCount": target_count,
+                "removedCount": data.get("removedCount") or 0,
+                "failedCount": data.get("failedCount") or len(failed_files),
+                "failedFiles": failed_files,
+            },
+        ).to_dict()
+
+    def _convert_folder_trash_move_response(
+        self,
+        result: dict[str, Any],
+        folder,
+        target_count: int,
+    ) -> dict[str, Any]:
+        """画像単位ごみ箱移動APIの結果をフォルダ単位操作のレスポンスへ変換する。"""
+
+        data = result.get("data") or {}
+        failed_files = data.get("failedFiles") or []
+        return ApiResponse(
+            success=bool(result.get("success")),
+            message=(
+                "フォルダ内画像をごみ箱へ移動しました。"
+                if result.get("success")
+                else result.get("message") or "フォルダ内画像のごみ箱移動に失敗しました。"
+            ),
+            data={
+                "folderId": folder.id,
+                "folderName": folder.name,
+                "folderPath": folder.path,
+                "targetCount": target_count,
+                "trashedCount": data.get("trashedCount") or 0,
+                "removedCount": data.get("removedCount") or 0,
+                "failedCount": data.get("failedCount") or len(failed_files),
+                "failedFiles": failed_files,
+            },
+        ).to_dict()
 
     def _move_items_to_trash_and_remove(
         self,

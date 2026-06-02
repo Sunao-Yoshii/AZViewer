@@ -369,6 +369,20 @@ body {
   color: #6c757d;
 }
 
+.folder-operation-list {
+  max-height: 45vh;
+  overflow: auto;
+}
+
+.folder-operation-main {
+  min-width: 0;
+}
+
+.folder-operation-path {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .folder-search-item.is-selected .folder-search-count {
   color: #fff;
 }

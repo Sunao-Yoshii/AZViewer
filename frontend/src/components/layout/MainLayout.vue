@@ -48,6 +48,8 @@ defineEmits([
   'move-selected-images',
   'move-selected-images-to-trash',
   'remove-selected-images-from-catalog',
+  'remove-folder-from-catalog',
+  'move-folder-to-trash',
   'open-bulk-attribute-edit',
   'open-bulk-tag-add',
   'open-wildcard-export',
@@ -77,6 +79,8 @@ defineEmits([
       @move-selected-images="$emit('move-selected-images')"
       @move-selected-images-to-trash="$emit('move-selected-images-to-trash')"
       @remove-selected-images-from-catalog="$emit('remove-selected-images-from-catalog')"
+      @remove-folder-from-catalog="$emit('remove-folder-from-catalog')"
+      @move-folder-to-trash="$emit('move-folder-to-trash')"
       @open-bulk-attribute-edit="$emit('open-bulk-attribute-edit')"
       @open-bulk-tag-add="$emit('open-bulk-tag-add')"
       @open-wildcard-export="$emit('open-wildcard-export')"

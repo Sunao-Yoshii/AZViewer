@@ -3,6 +3,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'v
 import BulkAttributeEditModal from './components/form/BulkAttributeEditModal.vue'
 import BulkTagAddModal from './components/form/BulkTagAddModal.vue'
 import DuplicateTagSetModal from './components/form/DuplicateTagSetModal.vue'
+import FolderOperationModal from './components/form/FolderOperationModal.vue'
 import ImageRenameModal from './components/form/ImageRenameModal.vue'
 import MasterMaintenanceModal from './components/form/MasterMaintenanceModal.vue'
 import WildcardExportModal from './components/form/WildcardExportModal.vue'
@@ -20,6 +21,7 @@ import { useLoadingOverlay } from './composables/useLoadingOverlay'
 import { useMasterMaintenance } from './composables/useMasterMaintenance'
 import { useToast } from './composables/useToast'
 import { useWildcardExport } from './composables/useWildcardExport'
+import { fetchFoldersForSearch } from './services/backendApi'
 
 const { status, setStatus } = useAppStatus()
 const { toasts, pushToast } = useToast()
@@ -33,6 +35,17 @@ const renameModal = reactive({
   filename: '',
   isSaving: false,
   errorMessage: '',
+})
+const folderOperationModal = reactive({
+  show: false,
+  mode: 'remove',
+  keyword: '',
+  folders: [],
+  selectedFolder: null,
+  totalCount: 0,
+  limit: 256,
+  isLoading: false,
+  isExecuting: false,
 })
 const selectedImageIds = computed(() => [...selectedImageIdSet.value])
 const selectedCount = computed(() => selectedImageIds.value.length)
@@ -212,6 +225,111 @@ async function handleMoveSelectedImages() {
     refresh: executeSearch,
     clearSelection,
   })
+}
+
+async function openRemoveFolderFromCatalogModal() {
+  openFolderOperationModal('remove')
+  await searchFolderOperationCandidates()
+}
+
+async function openMoveFolderToTrashModal() {
+  openFolderOperationModal('trash')
+  await searchFolderOperationCandidates()
+}
+
+function openFolderOperationModal(mode) {
+  Object.assign(folderOperationModal, {
+    show: true,
+    mode,
+    keyword: '',
+    folders: [],
+    selectedFolder: null,
+    totalCount: 0,
+    limit: 256,
+    isLoading: false,
+    isExecuting: false,
+  })
+}
+
+function closeFolderOperationModal() {
+  if (folderOperationModal.isExecuting) {
+    return
+  }
+
+  Object.assign(folderOperationModal, {
+    show: false,
+    mode: 'remove',
+    keyword: '',
+    folders: [],
+    selectedFolder: null,
+    totalCount: 0,
+    limit: 256,
+    isLoading: false,
+    isExecuting: false,
+  })
+}
+
+function updateFolderOperationKeyword(keyword) {
+  folderOperationModal.keyword = keyword
+}
+
+function selectFolderForOperation(folder) {
+  folderOperationModal.selectedFolder = folder
+}
+
+async function searchFolderOperationCandidates() {
+  folderOperationModal.isLoading = true
+
+  try {
+    const result = await fetchFoldersForSearch({
+      keyword: folderOperationModal.keyword,
+      limit: folderOperationModal.limit,
+    })
+    if (!result?.success) {
+      folderOperationModal.folders = []
+      folderOperationModal.totalCount = 0
+      pushToast({ type: 'danger', message: result?.message || 'フォルダ一覧を取得できませんでした。' })
+      return
+    }
+
+    folderOperationModal.folders = result.data?.folders ?? []
+    folderOperationModal.totalCount = result.data?.totalCount ?? 0
+    folderOperationModal.limit = result.data?.limit ?? 256
+  } catch {
+    folderOperationModal.folders = []
+    folderOperationModal.totalCount = 0
+    pushToast({ type: 'danger', message: 'フォルダ一覧を取得できませんでした。' })
+  } finally {
+    folderOperationModal.isLoading = false
+  }
+}
+
+async function executeFolderOperation() {
+  const folder = folderOperationModal.selectedFolder
+  if (!folder?.id) {
+    pushToast({ type: 'warning', message: '操作対象のフォルダを選択してください。' })
+    return
+  }
+
+  folderOperationModal.isExecuting = true
+  try {
+    if (folderOperationModal.mode === 'trash') {
+      await imageMutations.moveFolderToTrash({
+        folder,
+        refresh: executeSearch,
+        clearSelection,
+      })
+    } else {
+      await imageMutations.removeFolderFromCatalog({
+        folder,
+        refresh: executeSearch,
+        clearSelection,
+      })
+    }
+  } finally {
+    folderOperationModal.isExecuting = false
+  }
+  closeFolderOperationModal()
 }
 
 function handleOpenBulkAttributeEdit() {
@@ -451,6 +569,8 @@ onBeforeUnmount(() => {
     @remove-selected-images-from-catalog="handleRemoveSelectedImagesFromCatalog"
     @move-selected-images-to-trash="handleMoveSelectedImagesToTrash"
     @move-selected-images="handleMoveSelectedImages"
+    @remove-folder-from-catalog="openRemoveFolderFromCatalogModal"
+    @move-folder-to-trash="openMoveFolderToTrashModal"
     @open-bulk-attribute-edit="handleOpenBulkAttributeEdit"
     @open-bulk-tag-add="handleOpenBulkTagAdd"
     @open-wildcard-export="handleOpenWildcardExport"
@@ -513,6 +633,22 @@ onBeforeUnmount(() => {
     @change-mode="wildcardExport.changeWildcardExportMode"
     @toggle-tag="wildcardExport.toggleWildcardExportTag"
     @save="wildcardExport.saveWildcardExport"
+  />
+  <FolderOperationModal
+    :show="folderOperationModal.show"
+    :mode="folderOperationModal.mode"
+    :folders="folderOperationModal.folders"
+    :keyword="folderOperationModal.keyword"
+    :selected-folder="folderOperationModal.selectedFolder"
+    :total-count="folderOperationModal.totalCount"
+    :limit="folderOperationModal.limit"
+    :is-loading="folderOperationModal.isLoading"
+    :is-executing="folderOperationModal.isExecuting"
+    @close="closeFolderOperationModal"
+    @update-keyword="updateFolderOperationKeyword"
+    @search="searchFolderOperationCandidates"
+    @select-folder="selectFolderForOperation"
+    @execute="executeFolderOperation"
   />
   <BulkAttributeEditModal
     :show="imageMutations.bulkAttributeEditModal.show"

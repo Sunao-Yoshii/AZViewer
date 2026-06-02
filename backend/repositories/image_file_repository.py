@@ -15,6 +15,7 @@ from backend.models import (
     ImageFileListItem,
     ImageFileRecord,
     ImageFolderMaintenanceItem,
+    ImageFolderReference,
     MasterBulkDeleteResult,
     MasterDeleteResult,
     MasterMaintenanceItem,
@@ -938,6 +939,29 @@ class ImageFileRepository:
             (folder_id,),
         ).fetchall()
         return [int(row["id"]) for row in rows]
+
+    def find_folder_by_id(self, folder_id: int) -> ImageFolderReference | None:
+        """IDに一致するフォルダ定義を取得する。"""
+
+        row = self._connection.execute(
+            """
+            SELECT
+                id,
+                folder_name,
+                folder_path
+            FROM image_folder
+            WHERE id = ?
+            LIMIT 1
+            """,
+            (folder_id,),
+        ).fetchone()
+        if row is None:
+            return None
+        return ImageFolderReference(
+            id=int(row["id"]),
+            name=str(row["folder_name"]),
+            path=str(row["folder_path"]),
+        )
 
     def delete_tag_master(self, tag_id: int) -> MasterDeleteResult:
         """タグマスタを削除し、影響画像のtag_hashを再同期する。"""

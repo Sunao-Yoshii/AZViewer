@@ -29,6 +29,8 @@ defineEmits([
   'move-selected-images',
   'move-selected-images-to-trash',
   'remove-selected-images-from-catalog',
+  'remove-folder-from-catalog',
+  'move-folder-to-trash',
   'import-prompt-tags',
   'import-caption-tags',
   'open-bulk-tag-add',
@@ -134,6 +136,38 @@ defineEmits([
                 @click="$emit('remove-selected-images-from-catalog')"
               >
                 選択画像を管理対象から除外
+              </button>
+            </li>
+          </ul>
+        </div>
+        <div class="dropdown">
+          <button
+            class="btn btn-outline-danger btn-sm dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            :disabled="isBusy"
+          >
+            フォルダ単位操作
+          </button>
+          <ul class="dropdown-menu">
+            <li>
+              <button
+                type="button"
+                class="dropdown-item"
+                :disabled="isBusy"
+                @click="$emit('remove-folder-from-catalog')"
+              >
+                フォルダを管理対象から除外
+              </button>
+            </li>
+            <li>
+              <button
+                type="button"
+                class="dropdown-item text-danger"
+                :disabled="isBusy"
+                @click="$emit('move-folder-to-trash')"
+              >
+                フォルダごとごみ箱へ移動
               </button>
             </li>
           </ul>
