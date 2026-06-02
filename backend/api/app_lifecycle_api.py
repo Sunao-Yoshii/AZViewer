@@ -4,7 +4,7 @@ import logging
 from typing import Any
 
 from backend.repositories import ImageFileRepository
-from backend.services import StartupCleanupService, ThumbnailCacheService
+from backend.services import DatabaseMigrationService, StartupCleanupService, ThumbnailCacheService
 
 from .api_response import ApiResponse
 from .database_lifecycle_manager import DatabaseLifecycleManager
@@ -44,6 +44,7 @@ class AppLifeCycleApi:
 
         try:
             self._database_lifecycle_manager.initialize()
+            DatabaseMigrationService(self._database_lifecycle_manager.get_engine()).migrate()
         except Exception as exc:
             LOGGER.exception("Application initialization failed.")
             return ApiResponse(success=False, message=str(exc), data=None).to_dict()

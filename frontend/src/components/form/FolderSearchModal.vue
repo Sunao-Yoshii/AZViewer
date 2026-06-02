@@ -6,8 +6,8 @@ const props = defineProps({
     type: Boolean,
     required: true,
   },
-  selectedFolder: {
-    type: String,
+  selectedFolderId: {
+    type: Number,
     default: null,
   },
   folderItems: {
@@ -41,7 +41,17 @@ watch(
     }
 
     filterText.value = ''
-    workingSelectedFolder.value = props.selectedFolder || null
+    workingSelectedFolder.value = findFolderById(props.selectedFolderId)
+  }
+)
+
+watch(
+  () => props.folderItems,
+  () => {
+    if (!props.show || workingSelectedFolder.value) {
+      return
+    }
+    workingSelectedFolder.value = findFolderById(props.selectedFolderId)
   }
 )
 
@@ -51,8 +61,15 @@ function handleSearch() {
   })
 }
 
-function selectFolder(folderName) {
-  workingSelectedFolder.value = folderName || null
+function findFolderById(folderId) {
+  if (!folderId) {
+    return null
+  }
+  return props.folderItems.find((folder) => folder.id === folderId) ?? null
+}
+
+function selectFolder(folder) {
+  workingSelectedFolder.value = folder || null
 }
 
 function clearFolder() {
@@ -85,13 +102,16 @@ function handleApply() {
               <div class="small fw-semibold mb-1">選択中</div>
               <div v-if="workingSelectedFolder" class="d-flex flex-wrap gap-1">
                 <span class="badge text-bg-secondary search-folder-badge">
-                  {{ workingSelectedFolder }}
+                  {{ workingSelectedFolder.name }}
                   <button
                     type="button"
                     class="btn-close btn-close-white ms-1 search-badge-close"
                     aria-label="フォルダ選択を解除"
                     @click="clearFolder"
                   ></button>
+                </span>
+                <span class="small text-secondary search-folder-path">
+                  {{ workingSelectedFolder.path }}
                 </span>
               </div>
               <div v-else class="small text-secondary">未選択</div>
@@ -128,14 +148,15 @@ function handleApply() {
             <div class="search-candidate-list">
               <button
                 v-for="folder in folderItems"
-                :key="folder.name"
+                :key="folder.id"
                 type="button"
                 class="badge text-bg-light border search-candidate-item folder-search-item"
-                :class="{ 'is-selected': workingSelectedFolder === folder.name }"
-                @click="selectFolder(folder.name)"
+                :class="{ 'is-selected': workingSelectedFolder?.id === folder.id }"
+                @click="selectFolder(folder)"
               >
                 <span class="folder-search-name">{{ folder.name }}</span>
-                <span class="folder-search-count">{{ folder.image_count }}</span>
+                <span class="folder-search-path">{{ folder.path }}</span>
+                <span class="folder-search-count">{{ folder.imageCount }}</span>
               </button>
               <div v-if="!isLoading && folderItems.length === 0" class="small text-secondary">
                 表示できるフォルダがありません

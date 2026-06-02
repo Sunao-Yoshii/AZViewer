@@ -185,6 +185,11 @@ class AppApi:
 
         return self._image_catalog_api.fetch_models_for_maintenance(payload)
 
+    def fetch_folders_for_maintenance(self, payload: dict[str, object]) -> dict[str, object]:
+        """フォルダメンテナンス候補を返す。"""
+
+        return self._image_catalog_api.fetch_folders_for_maintenance(payload)
+
     def delete_model_master(self, payload: dict[str, object]) -> dict[str, object]:
         """モデルマスタを削除する。"""
 
@@ -199,6 +204,11 @@ class AppApi:
         """未使用モデルマスタを一括削除する。"""
 
         return self._image_catalog_api.delete_unused_models(payload)
+
+    def delete_unused_folders(self, payload: dict[str, object] | None = None) -> dict[str, object]:
+        """未使用フォルダマスタを一括削除する。"""
+
+        return self._image_catalog_api.delete_unused_folders(payload)
 
     def fetch_duplicate_tag_sets(self, payload: dict[str, object] | None = None) -> dict[str, object]:
         """重複タグ構成一覧を返す。"""

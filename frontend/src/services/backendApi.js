@@ -144,6 +144,10 @@ export async function fetchModelsForMaintenance(payload = {}) {
   return await callBackendApi('fetch_models_for_maintenance', payload)
 }
 
+export async function fetchFoldersForMaintenance(payload = {}) {
+  return await callBackendApi('fetch_folders_for_maintenance', payload)
+}
+
 export async function deleteModelMaster(id) {
   return await callBackendApi('delete_model_master', { id })
 }
@@ -154,6 +158,10 @@ export async function replaceModelMaster(payload) {
 
 export async function deleteUnusedModels() {
   return await callBackendApi('delete_unused_models', {})
+}
+
+export async function deleteUnusedFolders() {
+  return await callBackendApi('delete_unused_folders', {})
 }
 
 export async function fetchDuplicateTagSets(payload = {}) {

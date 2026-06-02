@@ -1,9 +1,11 @@
 import { reactive } from 'vue'
 import {
+  deleteUnusedFolders,
   deleteModelMaster,
   deleteTagMaster,
   deleteUnusedModels,
   deleteUnusedTags,
+  fetchFoldersForMaintenance,
   fetchModelsForMaintenance,
   fetchTagsForMaintenance,
   replaceModelMaster,
@@ -26,7 +28,13 @@ function createMasterMaintenanceModal() {
 }
 
 function modeLabel(mode) {
-  return mode === 'tag' ? 'タグ' : 'モデル'
+  if (mode === 'tag') {
+    return 'タグ'
+  }
+  if (mode === 'model') {
+    return 'モデル'
+  }
+  return 'フォルダ'
 }
 
 function buildDeleteConfirmMessage(mode, item) {
@@ -51,6 +59,14 @@ function buildReplaceConfirmMessage(mode, item, replacementName) {
 }
 
 function buildDeleteUnusedConfirmMessage(mode) {
+  if (mode === 'folder') {
+    return [
+      '画像に紐づいていないフォルダ定義を削除します。',
+      '実際のフォルダや画像ファイルは削除されません。',
+      '',
+      '実行しますか？',
+    ].join('\n')
+  }
   const label = mode === 'tag' ? '未使用タグ' : '未使用モデル'
   return `${label}を一括削除します。\n\n使用件数 0 件のマスタのみ削除します。\n実行しますか？`
 }
@@ -62,6 +78,14 @@ function toActionSet(mode) {
       deleteItem: deleteTagMaster,
       replaceItem: replaceTagMaster,
       deleteUnused: deleteUnusedTags,
+    }
+  }
+  if (mode === 'folder') {
+    return {
+      fetchItems: fetchFoldersForMaintenance,
+      deleteItem: null,
+      replaceItem: null,
+      deleteUnused: deleteUnusedFolders,
     }
   }
   return {
@@ -76,7 +100,7 @@ export function useMasterMaintenance({ pushToast, loading, refresh }) {
   const masterMaintenanceModal = reactive(createMasterMaintenanceModal())
 
   async function openMasterMaintenance(mode) {
-    if (!['tag', 'model'].includes(mode)) {
+    if (!['tag', 'model', 'folder'].includes(mode)) {
       return
     }
 
@@ -96,6 +120,9 @@ export function useMasterMaintenance({ pushToast, loading, refresh }) {
   }
 
   function changeMasterMaintenanceTab(tab) {
+    if (masterMaintenanceModal.mode === 'folder') {
+      return
+    }
     if (!['delete', 'replace'].includes(tab) || masterMaintenanceModal.isProcessing) {
       return
     }
@@ -150,6 +177,9 @@ export function useMasterMaintenance({ pushToast, loading, refresh }) {
   }
 
   async function deleteMasterMaintenanceItem(item) {
+    if (masterMaintenanceModal.mode === 'folder') {
+      return
+    }
     if (!item?.id || !window.confirm(buildDeleteConfirmMessage(masterMaintenanceModal.mode, item))) {
       return
     }
@@ -164,6 +194,9 @@ export function useMasterMaintenance({ pushToast, loading, refresh }) {
   }
 
   async function replaceMasterMaintenanceItem() {
+    if (masterMaintenanceModal.mode === 'folder') {
+      return
+    }
     const item = masterMaintenanceModal.selectedItem
     const newName = masterMaintenanceModal.replacementName.trim()
     if (!item?.id || !newName || !window.confirm(buildReplaceConfirmMessage(masterMaintenanceModal.mode, item, newName))) {
@@ -185,11 +218,15 @@ export function useMasterMaintenance({ pushToast, loading, refresh }) {
     }
 
     await processMasterMutation({
-      title: `${modeLabel(masterMaintenanceModal.mode)}を整理中`,
-      message: '未使用マスタを削除しています...',
+      title: masterMaintenanceModal.mode === 'folder'
+        ? '未使用フォルダを削除しています'
+        : `${modeLabel(masterMaintenanceModal.mode)}を整理中`,
+      message: masterMaintenanceModal.mode === 'folder'
+        ? '処理が完了するまで操作しないでください。'
+        : '未使用マスタを削除しています...',
       run: () => toActionSet(masterMaintenanceModal.mode).deleteUnused(),
       failureMessage: `未使用${modeLabel(masterMaintenanceModal.mode)}の削除に失敗しました。`,
-      success: (result) => `未使用${modeLabel(masterMaintenanceModal.mode)}を削除しました。削除: ${result.data?.deletedCount ?? 0} 件`,
+      success: (result) => `未使用${modeLabel(masterMaintenanceModal.mode)}を削除しました。削除件数: ${result.data?.deletedCount ?? 0} 件`,
     })
   }
 

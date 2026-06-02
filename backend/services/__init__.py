@@ -1,6 +1,7 @@
 from .dialog_service import DialogService
 from .bulk_tag_add_service import BulkTagAddService
 from .caption_tag_import_service import CaptionTagImportService
+from .database_migration_service import DatabaseMigrationService
 from .file_scan_service import FileScanService
 from .image_file_import_service import ImageFileImportService
 from .image_metadata_service import ImageMetadataService
@@ -15,6 +16,7 @@ __all__ = [
     "DialogService",
     "BulkTagAddService",
     "CaptionTagImportService",
+    "DatabaseMigrationService",
     "FileScanService",
     "ImageFileImportService",
     "ImageMetadataService",

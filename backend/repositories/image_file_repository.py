@@ -14,6 +14,7 @@ from backend.models import (
     ImageModelListItem,
     ImageFileListItem,
     ImageFileRecord,
+    ImageFolderMaintenanceItem,
     MasterBulkDeleteResult,
     MasterDeleteResult,
     MasterMaintenanceItem,
@@ -190,18 +191,31 @@ class ImageFileRepository:
 
         self._connection.execute(
             """
+            CREATE TABLE IF NOT EXISTS image_folder (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                folder_path TEXT NOT NULL UNIQUE,
+                folder_name TEXT NOT NULL
+            )
+            """
+        )
+        self._connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS image_file_data (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 filename TEXT NOT NULL,
                 path TEXT NOT NULL UNIQUE,
-                folder TEXT NOT NULL,
+                folder_id INTEGER NOT NULL,
                 rating TEXT NOT NULL CHECK (rating IN ('General', 'R-15', 'R-18', 'R-18G')),
                 is_checked INTEGER NOT NULL CHECK (is_checked IN (0, 1)),
                 is_favorite INTEGER NOT NULL CHECK (is_favorite IN (0, 1)),
-                comment TEXT NULL
+                comment TEXT NULL,
+                FOREIGN KEY (folder_id)
+                    REFERENCES image_folder(id)
+                    ON DELETE RESTRICT
             )
             """
         )
+        self._create_folder_indexes()
         self._connection.execute(
             """
             CREATE TABLE IF NOT EXISTS tag (
@@ -229,6 +243,22 @@ class ImageFileRepository:
         self._create_tag_hash_table()
         self._create_image_model_tables()
         self._connection.commit()
+
+    def _create_folder_indexes(self) -> None:
+        """フォルダ管理用テーブルのインデックスを作成する。"""
+
+        self._connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_image_folder_folder_name
+            ON image_folder(folder_name)
+            """
+        )
+        self._connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_image_file_data_folder_id
+            ON image_file_data(folder_id)
+            """
+        )
 
     def _create_tag_hash_table(self) -> None:
         """タグ構成検索用の派生インデックステーブルを作成する。"""
@@ -300,6 +330,26 @@ class ImageFileRepository:
             """
         )
 
+    def _image_file_select_sql(self, from_clause: str = "image_file") -> str:
+        """画像一覧DTO用のSELECT句とJOIN句を返す。"""
+
+        return f"""
+            SELECT
+                {from_clause}.id,
+                {from_clause}.filename,
+                {from_clause}.path,
+                image_folder.folder_name AS folder,
+                image_folder.id AS folder_id,
+                image_folder.folder_path AS folder_path,
+                {from_clause}.rating,
+                {from_clause}.is_checked,
+                {from_clause}.is_favorite,
+                {from_clause}.comment
+            FROM image_file_data {from_clause}
+            INNER JOIN image_folder
+                ON image_folder.id = {from_clause}.folder_id
+        """
+
     def find_all_paths(self) -> list[str]:
         """登録済み画像ファイルのパス一覧を取得する。"""
 
@@ -310,18 +360,9 @@ class ImageFileRepository:
         """登録済み画像ファイル情報を全件取得する。"""
 
         rows = self._connection.execute(
-            """
-            SELECT
-                id,
-                filename,
-                path,
-                folder,
-                rating,
-                is_checked,
-                is_favorite,
-                comment
-            FROM image_file_data
-            ORDER BY id DESC
+            f"""
+            {self._image_file_select_sql()}
+            ORDER BY image_file.id DESC
             """
         ).fetchall()
         return self._attach_related_data([self._row_to_item(row) for row in rows])
@@ -330,17 +371,8 @@ class ImageFileRepository:
         """タグが1件も紐づいていない画像ファイル情報を取得する。"""
 
         rows = self._connection.execute(
-            """
-            SELECT
-                id,
-                filename,
-                path,
-                folder,
-                rating,
-                is_checked,
-                is_favorite,
-                comment
-            FROM image_file_data image_file
+            f"""
+            {self._image_file_select_sql()}
             WHERE NOT EXISTS (
                 SELECT 1
                 FROM tag_image_link tag_link
@@ -355,17 +387,8 @@ class ImageFileRepository:
         """生成元モデルが紐づいていない画像ファイル情報を取得する。"""
 
         rows = self._connection.execute(
-            """
-            SELECT
-                id,
-                filename,
-                path,
-                folder,
-                rating,
-                is_checked,
-                is_favorite,
-                comment
-            FROM image_file_data image_file
+            f"""
+            {self._image_file_select_sql()}
             WHERE NOT EXISTS (
                 SELECT 1
                 FROM image_model_to_file_data model_link
@@ -402,32 +425,73 @@ class ImageFileRepository:
         if not records:
             return
 
-        self._connection.executemany(
-            """
-            INSERT INTO image_file_data (
-                filename,
-                path,
-                folder,
-                rating,
-                is_checked,
-                is_favorite,
-                comment
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-            """,
-            [
-                (
-                    record.filename,
-                    record.path,
-                    record.folder,
-                    record.rating,
-                    record.is_checked,
-                    record.is_favorite,
-                    record.comment,
+        try:
+            self._connection.execute("BEGIN")
+            for record in records:
+                folder_id = self.find_or_create_image_folder(
+                    record.folder_path,
+                    record.folder_name,
                 )
-                for record in records
-            ],
+                self._connection.execute(
+                    """
+                    INSERT INTO image_file_data (
+                        filename,
+                        path,
+                        folder_id,
+                        rating,
+                        is_checked,
+                        is_favorite,
+                        comment
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        record.filename,
+                        record.path,
+                        folder_id,
+                        record.rating,
+                        record.is_checked,
+                        record.is_favorite,
+                        record.comment,
+                    ),
+                )
+            self._connection.commit()
+        except Exception:
+            self._connection.rollback()
+            raise
+
+    def find_or_create_image_folder(self, folder_path: str, folder_name: str) -> int:
+        """フォルダパスに対応するIDを取得し、未登録の場合は作成する。"""
+
+        normalized_path = str(folder_path or "").strip()
+        normalized_name = str(folder_name or "").strip()
+        if not normalized_path:
+            raise ValueError("folder_path is required.")
+        if not normalized_name:
+            raise ValueError("folder_name is required.")
+
+        self._connection.execute(
+            """
+            INSERT OR IGNORE INTO image_folder (
+                folder_path,
+                folder_name
+            )
+            VALUES (?, ?)
+            """,
+            (normalized_path, normalized_name),
         )
+        row = self._connection.execute(
+            """
+            SELECT id
+            FROM image_folder
+            WHERE folder_path = ?
+            LIMIT 1
+            """,
+            (normalized_path,),
+        ).fetchone()
+        if row is None:
+            raise RuntimeError(f"Image folder could not be created: {normalized_path}")
+        return int(row["id"])
 
     def exists_by_path(self, path: str) -> bool:
         """指定されたパスの画像ファイル情報が登録済みか判定する。"""
@@ -447,17 +511,8 @@ class ImageFileRepository:
         placeholders = ", ".join("?" for _ in paths)
         rows = self._connection.execute(
             f"""
-            SELECT
-                id,
-                filename,
-                path,
-                folder,
-                rating,
-                is_checked,
-                is_favorite,
-                comment
-            FROM image_file_data
-            WHERE path IN ({placeholders})
+            {self._image_file_select_sql()}
+            WHERE image_file.path IN ({placeholders})
             """,
             paths,
         ).fetchall()
@@ -472,18 +527,9 @@ class ImageFileRepository:
         placeholders = ", ".join("?" for _ in record_ids)
         rows = self._connection.execute(
             f"""
-            SELECT
-                id,
-                filename,
-                path,
-                folder,
-                rating,
-                is_checked,
-                is_favorite,
-                comment
-            FROM image_file_data
-            WHERE id IN ({placeholders})
-            ORDER BY id ASC
+            {self._image_file_select_sql()}
+            WHERE image_file.id IN ({placeholders})
+            ORDER BY image_file.id ASC
             """,
             record_ids,
         ).fetchall()
@@ -510,7 +556,7 @@ class ImageFileRepository:
         is_checked: bool | int | None = None,
         is_favorite: bool | int | None = None,
         tags: list[str] | None = None,
-        folder: str | None = None,
+        folder_id: int | None = None,
         model: str | None = None,
         tag_hash: str | None = None,
         tag_set: str | None = None,
@@ -529,7 +575,7 @@ class ImageFileRepository:
             is_checked=is_checked,
             is_favorite=is_favorite,
             tags=tags,
-            folder=folder,
+            folder_id=folder_id,
             model=model,
             tag_hash=tag_hash,
             tag_set=tag_set,
@@ -538,7 +584,11 @@ class ImageFileRepository:
         where_sql = f"WHERE {' AND '.join(where_clauses)}" if where_clauses else ""
         total_count = int(
             self._connection.execute(
-                f"SELECT COUNT(*) AS count FROM image_file_data {where_sql}",
+                f"""
+                SELECT COUNT(*) AS count
+                FROM image_file_data image_file
+                {where_sql}
+                """,
                 params,
             ).fetchone()["count"]
         )
@@ -547,16 +597,7 @@ class ImageFileRepository:
         order_sql = self._build_order_by(sort)
         rows = self._connection.execute(
             f"""
-            SELECT
-                id,
-                filename,
-                path,
-                folder,
-                rating,
-                is_checked,
-                is_favorite,
-                comment
-            FROM image_file_data
+            {self._image_file_select_sql()}
             {where_sql}
             ORDER BY {order_sql}
             LIMIT ? OFFSET ?
@@ -618,19 +659,35 @@ class ImageFileRepository:
         rows = self._connection.execute(
             """
             SELECT
-                folder AS name,
-                COUNT(*) AS image_count,
-                MIN(id) AS first_id
-            FROM image_file_data
-            WHERE (:keyword = '' OR folder LIKE :keyword_like)
-            GROUP BY folder
+                image_folder.id,
+                image_folder.folder_name AS name,
+                image_folder.folder_path AS path,
+                COUNT(image_file.id) AS image_count,
+                MIN(image_file.id) AS first_id
+            FROM image_folder
+            INNER JOIN image_file_data image_file
+                ON image_file.folder_id = image_folder.id
+            WHERE (
+                :keyword = ''
+                OR image_folder.folder_name LIKE :keyword_like
+                OR image_folder.folder_path LIKE :keyword_like
+            )
+            GROUP BY
+                image_folder.id,
+                image_folder.folder_name,
+                image_folder.folder_path
             ORDER BY first_id ASC
             LIMIT :limit
             """,
             params,
         ).fetchall()
         return [
-            FolderListItem(name=str(row["name"]), image_count=int(row["image_count"]))
+            FolderListItem(
+                id=int(row["id"]),
+                name=str(row["name"]),
+                path=str(row["path"]),
+                image_count=int(row["image_count"]),
+            )
             for row in rows
         ]
 
@@ -643,13 +700,17 @@ class ImageFileRepository:
                 """
                 SELECT
                     COUNT(*) AS count
-                FROM (
-                    SELECT
-                        folder
-                    FROM image_file_data
-                    WHERE (:keyword = '' OR folder LIKE :keyword_like)
-                    GROUP BY folder
-                ) folders
+                FROM image_folder
+                WHERE EXISTS (
+                    SELECT 1
+                    FROM image_file_data image_file
+                    WHERE image_file.folder_id = image_folder.id
+                )
+                  AND (
+                    :keyword = ''
+                    OR image_folder.folder_name LIKE :keyword_like
+                    OR image_folder.folder_path LIKE :keyword_like
+                  )
                 """,
                 params,
             ).fetchone()["count"]
@@ -781,6 +842,102 @@ class ImageFileRepository:
                 params,
             ).fetchone()["count"]
         )
+
+    def find_folders_for_maintenance(
+        self,
+        keyword: str | None = None,
+        limit: int = 50,
+    ) -> list[ImageFolderMaintenanceItem]:
+        """フォルダメンテナンス候補を使用件数付きで取得する。"""
+
+        params = self._build_folder_search_params(keyword, limit)
+        rows = self._connection.execute(
+            """
+            SELECT
+                image_folder.id,
+                image_folder.folder_name AS name,
+                image_folder.folder_path AS path,
+                COUNT(image_file.id) AS image_count
+            FROM image_folder
+            LEFT JOIN image_file_data image_file
+                ON image_file.folder_id = image_folder.id
+            WHERE (
+                :keyword = ''
+                OR image_folder.folder_name LIKE :keyword_like
+                OR image_folder.folder_path LIKE :keyword_like
+            )
+            GROUP BY
+                image_folder.id,
+                image_folder.folder_name,
+                image_folder.folder_path
+            ORDER BY image_folder.folder_path ASC
+            LIMIT :limit
+            """,
+            params,
+        ).fetchall()
+        return [
+            ImageFolderMaintenanceItem(
+                id=int(row["id"]),
+                name=str(row["name"]),
+                path=str(row["path"]),
+                image_count=int(row["image_count"]),
+            )
+            for row in rows
+        ]
+
+    def count_folders_for_maintenance(self, keyword: str | None = None) -> int:
+        """フォルダメンテナンス候補の条件一致総数を取得する。"""
+
+        params = self._build_folder_search_params(keyword, 1)
+        return int(
+            self._connection.execute(
+                """
+                SELECT COUNT(*) AS count
+                FROM image_folder
+                WHERE (
+                    :keyword = ''
+                    OR folder_name LIKE :keyword_like
+                    OR folder_path LIKE :keyword_like
+                )
+                """,
+                params,
+            ).fetchone()["count"]
+        )
+
+    def delete_unused_folders(self) -> MasterBulkDeleteResult:
+        """画像から参照されていないフォルダマスタを一括削除する。"""
+
+        try:
+            self._connection.execute("BEGIN")
+            cursor = self._connection.execute(
+                """
+                DELETE FROM image_folder
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM image_file_data image_file
+                    WHERE image_file.folder_id = image_folder.id
+                )
+                """
+            )
+            self._connection.commit()
+            return MasterBulkDeleteResult(deleted_count=cursor.rowcount)
+        except Exception:
+            self._connection.rollback()
+            raise
+
+    def find_image_ids_by_folder_id(self, folder_id: int) -> list[int]:
+        """フォルダIDに紐づく画像ID一覧を取得する。"""
+
+        rows = self._connection.execute(
+            """
+            SELECT id
+            FROM image_file_data
+            WHERE folder_id = ?
+            ORDER BY id ASC
+            """,
+            (folder_id,),
+        ).fetchall()
+        return [int(row["id"]) for row in rows]
 
     def delete_tag_master(self, tag_id: int) -> MasterDeleteResult:
         """タグマスタを削除し、影響画像のtag_hashを再同期する。"""
@@ -956,24 +1113,36 @@ class ImageFileRepository:
             raise
 
     def update_paths(self, updates: list[dict[str, object]]) -> int:
-        """指定ID群のパスとフォルダを更新し、更新件数を返す。"""
+        """指定ID群のファイル識別情報を更新し、更新件数を返す。"""
 
         if not updates:
             return 0
 
         try:
             self._connection.execute("BEGIN")
-            cursor = self._connection.executemany(
-                """
-                UPDATE image_file_data
-                SET
-                    path = :path,
-                    folder = :folder
-                WHERE id = :id
-                """,
-                updates,
-            )
-            updated_count = cursor.rowcount
+            updated_count = 0
+            for update in updates:
+                folder_id = self.find_or_create_image_folder(
+                    str(update.get("folder_path") or ""),
+                    str(update.get("folder_name") or ""),
+                )
+                cursor = self._connection.execute(
+                    """
+                    UPDATE image_file_data
+                    SET
+                        filename = :filename,
+                        path = :path,
+                        folder_id = :folder_id
+                    WHERE id = :id
+                    """,
+                    {
+                        "id": update["id"],
+                        "filename": update["filename"],
+                        "path": update["path"],
+                        "folder_id": folder_id,
+                    },
+                )
+                updated_count += cursor.rowcount
             if updated_count != len(updates):
                 raise RuntimeError("Some image file paths could not be updated.")
             self._connection.commit()
@@ -982,8 +1151,8 @@ class ImageFileRepository:
             self._connection.rollback()
             raise
 
-    def update_file_identity(self, record_id: int, filename: str, path: str, folder: str) -> int:
-        """指定IDのファイル名、パス、フォルダ名を更新する。"""
+    def update_file_identity(self, record_id: int, filename: str, path: str) -> int:
+        """指定IDのファイル名とパスを更新する。"""
 
         try:
             self._connection.execute("BEGIN")
@@ -992,11 +1161,10 @@ class ImageFileRepository:
                 UPDATE image_file_data
                 SET
                     filename = ?,
-                    path = ?,
-                    folder = ?
+                    path = ?
                 WHERE id = ?
                 """,
-                (filename, path, folder, record_id),
+                (filename, path, record_id),
             )
             self._connection.commit()
             return cursor.rowcount
@@ -1171,18 +1339,9 @@ class ImageFileRepository:
         """IDに一致する画像ファイル情報を取得する。"""
 
         row = self._connection.execute(
-            """
-            SELECT
-                id,
-                filename,
-                path,
-                folder,
-                rating,
-                is_checked,
-                is_favorite,
-                comment
-            FROM image_file_data
-            WHERE id = ?
+            f"""
+            {self._image_file_select_sql()}
+            WHERE image_file.id = ?
             LIMIT 1
             """,
             (record_id,),
@@ -1399,6 +1558,8 @@ class ImageFileRepository:
             filename=str(row["filename"]),
             path=str(row["path"]),
             folder=str(row["folder"]),
+            folder_id=int(row["folder_id"]),
+            folder_path=str(row["folder_path"]),
             rating=str(row["rating"]),
             is_checked=int(row["is_checked"]),
             is_favorite=int(row["is_favorite"]),
@@ -1664,12 +1825,12 @@ class ImageFileRepository:
         """許可済みソート値からORDER BY句を生成する。"""
 
         mapping = {
-            "id_desc": "id DESC",
-            "id_asc": "id ASC",
-            "filename_asc": "filename COLLATE NOCASE ASC, id DESC",
-            "filename_desc": "filename COLLATE NOCASE DESC, id DESC",
-            "rating_asc": "rating ASC, id DESC",
-            "rating_desc": "rating DESC, id DESC",
+            "id_desc": "image_file.id DESC",
+            "id_asc": "image_file.id ASC",
+            "filename_asc": "image_file.filename COLLATE NOCASE ASC, image_file.id DESC",
+            "filename_desc": "image_file.filename COLLATE NOCASE DESC, image_file.id DESC",
+            "rating_asc": "image_file.rating ASC, image_file.id DESC",
+            "rating_desc": "image_file.rating DESC, image_file.id DESC",
         }
         return mapping.get(sort, mapping["id_desc"])
 
@@ -1681,7 +1842,7 @@ class ImageFileRepository:
         is_checked: bool | int | None,
         is_favorite: bool | int | None,
         tags: list[str] | None,
-        folder: str | None,
+        folder_id: int | None,
         model: str | None,
         tag_hash: str | None,
         tag_set: str | None,
@@ -1694,22 +1855,22 @@ class ImageFileRepository:
 
         normalized_path = path.strip()
         if normalized_path:
-            where_clauses.append("path LIKE ?")
+            where_clauses.append("image_file.path LIKE ?")
             params.append(f"%{normalized_path}%")
 
         if rating:
-            where_clauses.append("rating = ?")
+            where_clauses.append("image_file.rating = ?")
             params.append(rating)
 
         if self._normalize_true_condition(is_checked):
-            where_clauses.append("is_checked = 1")
+            where_clauses.append("image_file.is_checked = 1")
 
         if self._normalize_true_condition(is_favorite):
-            where_clauses.append("is_favorite = 1")
+            where_clauses.append("image_file.is_favorite = 1")
 
-        if folder:
-            where_clauses.append("folder = ?")
-            params.append(folder)
+        if folder_id is not None:
+            where_clauses.append("image_file.folder_id = ?")
+            params.append(folder_id)
 
         self._append_model_condition(where_clauses, params, model)
         self._append_tag_conditions(where_clauses, params, tags)
@@ -1732,7 +1893,7 @@ class ImageFileRepository:
         placeholders = ", ".join("?" for _ in normalized_tags)
         where_clauses.append(
             f"""
-            id IN (
+            image_file.id IN (
                 SELECT
                     tag_image_link.image_file_id
                 FROM tag_image_link
@@ -1761,7 +1922,7 @@ class ImageFileRepository:
 
         where_clauses.append(
             """
-            id IN (
+            image_file.id IN (
                 SELECT
                     tag_hash.image_file_data_id
                 FROM tag_hash
@@ -1791,7 +1952,7 @@ class ImageFileRepository:
                 FROM tag_image_link tag_link_keyword
                 INNER JOIN tag tag_keyword
                     ON tag_keyword.id = tag_link_keyword.tag_id
-                WHERE tag_link_keyword.image_file_id = image_file_data.id
+                WHERE tag_link_keyword.image_file_id = image_file.id
                   AND tag_keyword.name LIKE ? ESCAPE '\\'
             )
             """
@@ -1811,7 +1972,7 @@ class ImageFileRepository:
 
         where_clauses.append(
             """
-            id IN (
+            image_file.id IN (
                 SELECT
                     model_link.image_file_data_id
                 FROM image_model_to_file_data model_link

@@ -7,7 +7,7 @@ defineProps({
   mode: {
     type: String,
     required: true,
-    validator: (value) => ['tag', 'model'].includes(value),
+    validator: (value) => ['tag', 'model', 'folder'].includes(value),
   },
   activeTab: {
     type: String,
@@ -69,7 +69,13 @@ defineEmits([
         <div class="modal-content">
           <div class="modal-header">
             <h5 class="modal-title">
-              {{ mode === 'tag' ? 'タグメンテナンス' : 'モデルメンテナンス' }}
+              {{
+                mode === 'tag'
+                  ? 'タグメンテナンス'
+                  : mode === 'model'
+                    ? 'モデルメンテナンス'
+                    : 'フォルダメンテナンス'
+              }}
             </h5>
             <button
               type="button"
@@ -81,7 +87,7 @@ defineEmits([
           </div>
 
           <div class="modal-body">
-            <ul class="nav nav-tabs">
+            <ul v-if="mode !== 'folder'" class="nav nav-tabs">
               <li class="nav-item">
                 <button
                   type="button"
@@ -111,7 +117,13 @@ defineEmits([
                 type="text"
                 class="form-control"
                 :value="keyword"
-                :placeholder="mode === 'tag' ? 'タグ名で検索' : 'モデル名で検索'"
+                :placeholder="
+                  mode === 'tag'
+                    ? 'タグ名で検索'
+                    : mode === 'model'
+                      ? 'モデル名で検索'
+                      : 'フォルダ名またはパスで検索'
+                "
                 :disabled="isLoading || isProcessing"
                 @input="$emit('update-keyword', $event.target.value)"
                 @keydown.enter.prevent="$emit('search')"
@@ -133,6 +145,31 @@ defineEmits([
             <div v-if="isLoading" class="text-muted mt-3">
               読み込み中...
             </div>
+
+            <template v-else-if="mode === 'folder'">
+              <button
+                type="button"
+                class="btn btn-outline-danger btn-sm mt-3"
+                :disabled="isLoading || isProcessing"
+                @click="$emit('delete-unused')"
+              >
+                未使用フォルダを削除
+              </button>
+
+              <div class="vstack gap-2 mt-3">
+                <div
+                  v-for="item in items"
+                  :key="item.id"
+                  class="border rounded p-2 folder-maintenance-item"
+                >
+                  <div class="d-flex justify-content-between gap-2">
+                    <div class="fw-semibold folder-maintenance-name">{{ item.name }}</div>
+                    <span class="badge text-bg-light">{{ item.imageCount }}</span>
+                  </div>
+                  <div class="small text-secondary folder-maintenance-path">{{ item.path }}</div>
+                </div>
+              </div>
+            </template>
 
             <template v-else-if="activeTab === 'delete'">
               <button

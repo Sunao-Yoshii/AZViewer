@@ -44,7 +44,8 @@ class FileScanService:
         return ImageFileRecord(
             filename=path.name,
             path=str(path),
-            folder=path.parent.name,
+            folder_path=str(path.parent),
+            folder_name=path.parent.name,
         )
 
     def _collect_direct_children(self, directory: Path) -> list[Path]:

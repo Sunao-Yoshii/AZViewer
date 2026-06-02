@@ -78,7 +78,7 @@ class ImageCatalogApi:
             is_checked=data.get("is_checked"),
             is_favorite=data.get("is_favorite"),
             tags=self._normalize_search_tags(data.get("tags")),
-            folder=self._normalize_search_folder(data.get("folder")),
+            folder_id=self._normalize_search_folder_id(data.get("folderId")),
             model=self._normalize_search_model(data.get("model")),
             tag_hash=tag_hash,
             tag_set=tag_set,
@@ -450,7 +450,7 @@ class ImageCatalogApi:
                 message="フォルダ一覧を取得できませんでした。",
                 data={
                     "folders": [],
-                    "total_count": 0,
+                    "totalCount": 0,
                     "limit": limit,
                 },
             ).to_dict()
@@ -460,7 +460,7 @@ class ImageCatalogApi:
             message="",
             data={
                 "folders": [folder.to_dict() for folder in folders],
-                "total_count": total_count,
+                "totalCount": total_count,
                 "limit": limit,
             },
         ).to_dict()
@@ -506,6 +506,38 @@ class ImageCatalogApi:
         """モデルメンテナンス候補を使用件数付きで返す。"""
 
         return self._fetch_master_maintenance_items(payload, "model")
+
+    def fetch_folders_for_maintenance(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """フォルダメンテナンス候補を使用件数付きで返す。"""
+
+        limit = 50
+        try:
+            data = payload if isinstance(payload, dict) else {}
+            keyword = str(data.get("keyword") or "").strip()
+            limit = self._normalize_master_maintenance_limit(data.get("limit"))
+            repository = self._get_repository()
+            folders = repository.find_folders_for_maintenance(keyword=keyword, limit=limit)
+            total_count = repository.count_folders_for_maintenance(keyword=keyword)
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="フォルダ一覧を取得できませんでした。",
+                data={
+                    "items": [],
+                    "totalCount": 0,
+                    "limit": limit,
+                },
+            ).to_dict()
+
+        return ApiResponse(
+            success=True,
+            message="",
+            data={
+                "items": [folder.to_dict() for folder in folders],
+                "totalCount": total_count,
+                "limit": limit,
+            },
+        ).to_dict()
 
     def delete_tag_master(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """タグマスタを削除し、紐づく画像から解除する。"""
@@ -598,6 +630,23 @@ class ImageCatalogApi:
             ).to_dict()
         except Exception:
             return ApiResponse(success=False, message="未使用モデルの削除に失敗しました。", data=None).to_dict()
+
+    def delete_unused_folders(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+        """未使用フォルダマスタを一括削除する。"""
+
+        try:
+            result = self._get_repository().delete_unused_folders()
+            return ApiResponse(
+                success=True,
+                message="未使用フォルダを削除しました。",
+                data=result.to_api_data(),
+            ).to_dict()
+        except Exception:
+            return ApiResponse(
+                success=False,
+                message="未使用フォルダの削除に失敗しました。",
+                data={"deletedCount": 0},
+            ).to_dict()
 
     def fetch_duplicate_tag_sets(self, payload: dict[str, Any] | None = None) -> dict[str, Any]:
         """重複しているタグ構成一覧を返す。"""
@@ -833,11 +882,17 @@ class ImageCatalogApi:
             tags.append(tag)
         return tags[:3]
 
-    def _normalize_search_folder(self, value: object) -> str | None:
-        """検索条件用フォルダを空文字ならNoneへ正規化する。"""
+    def _normalize_search_folder_id(self, value: object) -> int | None:
+        """検索条件用フォルダIDを正の整数またはNoneへ正規化する。"""
 
-        folder = str(value or "").strip()
-        return folder or None
+        if value in (None, ""):
+            return None
+
+        try:
+            folder_id = int(value)
+        except (TypeError, ValueError):
+            return None
+        return folder_id if folder_id > 0 else None
 
     def _normalize_search_model(self, value: object) -> str | None:
         """検索条件用モデル名を空文字ならNoneへ正規化する。"""
@@ -1260,7 +1315,6 @@ class ImageCatalogApi:
                 item.id,
                 destination_path.name,
                 str(destination_path),
-                destination_path.parent.name,
             )
             if updated_count != 1:
                 raise RuntimeError("Image file record could not be updated.")
@@ -1393,17 +1447,21 @@ class ImageCatalogApi:
             "id": item.id,
             "old_path": str(source_path),
             "new_path": str(destination_path),
-            "folder": destination_path.parent.name,
+            "filename": destination_path.name,
+            "folder_path": str(destination_path.parent),
+            "folder_name": destination_path.parent.name,
         }
 
     def _build_path_updates(self, moved_items: list[dict[str, object]]) -> list[dict[str, object]]:
-        """DBのpath/folder更新用ペイロードを作る。"""
+        """DBのファイル識別情報更新用ペイロードを作る。"""
 
         return [
             {
                 "id": item["id"],
                 "path": item["new_path"],
-                "folder": item["folder"],
+                "filename": item["filename"],
+                "folder_path": item["folder_path"],
+                "folder_name": item["folder_name"],
             }
             for item in moved_items
         ]

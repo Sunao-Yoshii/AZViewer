@@ -218,6 +218,15 @@ defineEmits([
                 モデルメンテナンス
               </button>
             </li>
+            <li>
+              <button
+                type="button"
+                class="dropdown-item"
+                @click="$emit('open-master-maintenance', 'folder')"
+              >
+                フォルダメンテナンス
+              </button>
+            </li>
           </ul>
         </div>
         <span class="text-secondary small d-none d-sm-inline">

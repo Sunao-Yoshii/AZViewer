@@ -356,6 +356,15 @@ body {
   overflow-wrap: anywhere;
 }
 
+.folder-search-path,
+.search-folder-path,
+.folder-maintenance-path,
+.folder-maintenance-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .folder-search-count {
   color: #6c757d;
 }

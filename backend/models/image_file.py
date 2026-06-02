@@ -9,7 +9,8 @@ class ImageFileRecord:
 
     filename: str
     path: str
-    folder: str
+    folder_path: str
+    folder_name: str
     rating: str = "General"
     is_checked: int = 0
     is_favorite: int = 0
@@ -24,6 +25,8 @@ class ImageFileListItem:
     filename: str
     path: str
     folder: str
+    folder_id: int
+    folder_path: str
     rating: str
     is_checked: int
     is_favorite: int
@@ -39,6 +42,8 @@ class ImageFileListItem:
             "filename": self.filename,
             "path": self.path,
             "folder": self.folder,
+            "folderId": self.folder_id,
+            "folderPath": self.folder_path,
             "rating": self.rating,
             "is_checked": self.is_checked,
             "is_favorite": self.is_favorite,
@@ -213,15 +218,53 @@ class TagListItem:
 class FolderListItem:
     """フォルダ検索候補の1件分データを表す。"""
 
+    id: int
     name: str
+    path: str
     image_count: int
 
     def to_dict(self) -> dict[str, object]:
         """API返却用の辞書形式へ変換する。"""
 
         return {
+            "id": self.id,
             "name": self.name,
-            "image_count": self.image_count,
+            "path": self.path,
+            "imageCount": self.image_count,
+        }
+
+
+@dataclass(frozen=True)
+class ImageFolderMaintenanceItem:
+    """フォルダメンテナンス候補の1件分データを表す。"""
+
+    id: int
+    name: str
+    path: str
+    image_count: int
+
+    def to_dict(self) -> dict[str, object]:
+        """API返却用の辞書形式へ変換する。"""
+
+        return {
+            "id": self.id,
+            "name": self.name,
+            "path": self.path,
+            "imageCount": self.image_count,
+        }
+
+
+@dataclass(frozen=True)
+class UnusedFolderDeleteResult:
+    """未使用フォルダマスタ削除処理の結果を表す。"""
+
+    deleted_count: int
+
+    def to_api_data(self) -> dict[str, object]:
+        """Vueへ返却するAPIレスポンス用のデータ形式に変換する。"""
+
+        return {
+            "deletedCount": self.deleted_count,
         }
 
 

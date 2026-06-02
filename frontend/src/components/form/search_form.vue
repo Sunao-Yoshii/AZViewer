@@ -56,7 +56,9 @@ function removeSearchTag(tag) {
 }
 
 function clearSearchFolder() {
-  props.filters.folder = null
+  props.filters.folderId = null
+  props.filters.folderName = ''
+  props.filters.folderPath = ''
 }
 
 function clearSearchModel() {
@@ -93,7 +95,9 @@ function closeFolderSearchModal() {
 }
 
 function applyFolder(folder) {
-  props.filters.folder = folder || null
+  props.filters.folderId = folder?.id ?? null
+  props.filters.folderName = folder?.name ?? ''
+  props.filters.folderPath = folder?.path ?? ''
   showFolderSearchModal.value = false
 }
 
@@ -154,7 +158,7 @@ async function handleSearchFolders({ keyword }) {
     }
 
     folderSearchState.items = result.data?.folders ?? []
-    folderSearchState.totalCount = result.data?.total_count ?? 0
+    folderSearchState.totalCount = result.data?.totalCount ?? 0
   } catch {
     applyFolderSearchFailure()
   } finally {
@@ -277,9 +281,9 @@ function applyModelSearchFailure(message = 'モデル一覧を取得できませ
         </button>
       </div>
 
-      <div v-if="filters.folder" class="d-flex flex-wrap gap-1">
+      <div v-if="filters.folderId" class="d-flex flex-column gap-1">
         <span class="badge text-bg-secondary search-folder-badge">
-          {{ filters.folder }}
+          {{ filters.folderName || filters.folderPath }}
           <button
             type="button"
             class="btn-close btn-close-white ms-1 search-badge-close"
@@ -287,6 +291,9 @@ function applyModelSearchFailure(message = 'モデル一覧を取得できませ
             :disabled="isBusy"
             @click="clearSearchFolder"
           ></button>
+        </span>
+        <span v-if="filters.folderPath" class="small text-secondary search-folder-path">
+          {{ filters.folderPath }}
         </span>
       </div>
       <div v-else class="small text-secondary">未指定</div>
@@ -389,7 +396,7 @@ function applyModelSearchFailure(message = 'モデル一覧を取得できませ
     />
     <FolderSearchModal
       :show="showFolderSearchModal"
-      :selected-folder="filters.folder"
+      :selected-folder-id="filters.folderId"
       :folder-items="folderSearchState.items"
       :total-count="folderSearchState.totalCount"
       :is-loading="folderSearchState.isLoading"

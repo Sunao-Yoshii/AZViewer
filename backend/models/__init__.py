@@ -10,6 +10,7 @@ from .image_file import (
     FileMoveFailure,
     FileMoveResult,
     FolderListItem,
+    ImageFolderMaintenanceItem,
     ImageRenameResult,
     ImageModelListItem,
     ImageFileRecord,
@@ -28,6 +29,7 @@ from .image_file import (
     TagListItem,
     TrashMoveFailure,
     TrashMoveResult,
+    UnusedFolderDeleteResult,
     WildcardExportResult,
 )
 
@@ -43,6 +45,7 @@ __all__ = [
     "FileMoveFailure",
     "FileMoveResult",
     "FolderListItem",
+    "ImageFolderMaintenanceItem",
     "ImageRenameResult",
     "ImageModelListItem",
     "ImageFileRecord",
@@ -61,5 +64,6 @@ __all__ = [
     "TagListItem",
     "TrashMoveFailure",
     "TrashMoveResult",
+    "UnusedFolderDeleteResult",
     "WildcardExportResult",
 ]
