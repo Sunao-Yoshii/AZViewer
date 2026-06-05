@@ -143,11 +143,11 @@ body {
 .modal-backdrop-shell {
   position: fixed;
   inset: 0;
-  z-index: 1050;
+  z-index: 1070;
 }
 
 .modal-backdrop-shell .modal {
-  z-index: 1055;
+  z-index: 1075;
 }
 
 .failed-file-list {

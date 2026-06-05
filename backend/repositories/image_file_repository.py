@@ -241,6 +241,7 @@ class ImageFileRepository:
             )
             """
         )
+        self._create_tag_link_indexes()
         self._create_tag_hash_table()
         self._create_image_model_tables()
         self._connection.commit()
@@ -258,6 +259,16 @@ class ImageFileRepository:
             """
             CREATE INDEX IF NOT EXISTS idx_image_file_data_folder_id
             ON image_file_data(folder_id)
+            """
+        )
+
+    def _create_tag_link_indexes(self) -> None:
+        """タグリンク検索用インデックスを作成する。"""
+
+        self._connection.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_tag_image_link_tag_id
+            ON tag_image_link(tag_id)
             """
         )
 

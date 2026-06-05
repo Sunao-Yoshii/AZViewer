@@ -27,6 +27,7 @@ class DatabaseMigrationService:
                 return
             if not has_folder and has_folder_id:
                 self._ensure_folder_indexes(conn)
+                self._ensure_tag_link_indexes(conn)
                 conn.commit()
                 return
             if has_folder and has_folder_id:
@@ -58,6 +59,7 @@ class DatabaseMigrationService:
         folder_ids = self._create_folders(conn, rows)
         self._rebuild_image_file_data(conn, rows, folder_ids)
         self._ensure_folder_indexes(conn)
+        self._ensure_tag_link_indexes(conn)
 
     def _fetch_old_image_file_rows(self, conn) -> list[dict[str, object]]:
         rows = conn.execute(
@@ -236,3 +238,31 @@ class DatabaseMigrationService:
                 """
             )
         )
+
+    def _ensure_tag_link_indexes(self, conn) -> None:
+        if not self._table_exists(conn, "tag_image_link"):
+            return
+
+        conn.execute(
+            text(
+                """
+                CREATE INDEX IF NOT EXISTS idx_tag_image_link_tag_id
+                ON tag_image_link(tag_id)
+                """
+            )
+        )
+
+    def _table_exists(self, conn, table_name: str) -> bool:
+        row = conn.execute(
+            text(
+                """
+                SELECT 1
+                FROM sqlite_master
+                WHERE type = 'table'
+                  AND name = :table_name
+                LIMIT 1
+                """
+            ),
+            {"table_name": table_name},
+        ).first()
+        return row is not None
